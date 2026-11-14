@@ -1,81 +1,8 @@
 
 
-.page-container {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  background-color: var(--bg-main);
-  color: var(--text-main);
-}
-
-.hero-section {
-  background: var(--hero-bg);
-  padding: 4rem 1.5rem 3rem;
-  border-bottom: 1px solid var(--border-color);
-  text-align: center;
-}
-
-.hero-container {
-  max-width: 840px;
-  margin: 0 auto;
-}
-
-.hero-title {
-  font-size: 2.25rem;
-  font-weight: 800;
-  color: var(--text-main);
-  line-height: 1.2;
-  margin-bottom: 1rem;
-}
-
-.hero-description {
-  font-size: 1.1rem;
-  color: var(--text-muted);
-  line-height: 1.7;
-  margin-bottom: 2rem;
-  max-width: 700px;
-  margin-inline: auto;
-}
-
-.hero-actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-
+/* Route Page Specific Styles */
 .routes-section {
   background-color: var(--bg-main);
-}
-
-.section {
-  padding: 4.5rem 1.5rem;
-}
-
-.section-container {
-  max-width: 1140px;
-  margin: 0 auto;
-}
-
-.section-header {
-  text-align: center;
-  max-width: 680px;
-  margin: 0 auto 3rem;
-}
-
-.section-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--text-main);
-  margin-bottom: 0.75rem;
-}
-
-.section-subtitle {
-  font-size: 1rem;
-  color: var(--text-subtle);
-  line-height: 1.6;
 }
 
 /* Filter Panel */
@@ -104,35 +31,6 @@
   font-weight: 600;
 }
 
-.filter-field input,
-.filter-field select {
-  width: 100%;
-  min-height: 44px;
-  padding: 0.65rem 0.85rem;
-  font-family: inherit;
-  font-size: 0.95rem;
-  color: var(--text-main);
-  background-color: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  outline: none;
-}
-
-.filter-field input::placeholder {
-  color: var(--text-subtle);
-}
-
-.filter-field input:focus,
-.filter-field select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-light);
-}
-
-.filter-field select option {
-  color: var(--text-main);
-  background-color: var(--bg-card);
-}
-
 .reset-btn {
   min-height: 44px;
 }
@@ -156,9 +54,6 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background-color: var(--bg-card);
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
 }
 
 .route-card-top {
@@ -178,26 +73,6 @@
   border-radius: 6px;
   font-size: 0.85rem;
   font-weight: 800;
-}
-
-.status-pill {
-  display: inline-block;
-  padding: 0.3rem 0.65rem;
-  border-radius: 999px;
-  background-color: #dcfce7;
-  color: #166534;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.status-inactive {
-  background-color: #fee2e2;
-  color: #991b1b;
-}
-
-.status-full {
-  background-color: #fef3c7;
-  color: #92400e;
 }
 
 .route-area {
@@ -247,14 +122,6 @@
   background-color: var(--border-color);
 }
 
-.detail-label {
-  display: block;
-  color: var(--text-subtle);
-  font-size: 0.78rem;
-  font-weight: 600;
-  margin-bottom: 0.2rem;
-}
-
 .location-item p {
   color: var(--text-main);
   font-weight: 600;
@@ -268,7 +135,9 @@
   margin-bottom: 1.25rem;
 }
 
-.time-box {
+.time-box,
+.assignment-box,
+.capacity-box {
   padding: 1rem;
   background-color: var(--bg-alt);
   border: 1px solid var(--border-color);
@@ -349,62 +218,6 @@
   color: var(--text-main);
 }
 
-.active-text {
-  color: #16a34a;
-  font-weight: 700;
-}
-
-.inactive-text {
-  color: #ef4444;
-  font-weight: 700;
-}
-
-/* Schedule Table */
-.schedule-table-wrapper {
-  width: 100%;
-  overflow-x: auto;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-}
-
-.schedule-table {
-  width: 100%;
-  min-width: 420px;
-  border-collapse: collapse;
-  background-color: var(--bg-card);
-}
-
-.schedule-table th,
-.schedule-table td {
-  padding: 0.8rem;
-  text-align: left;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.schedule-table th {
-  color: var(--text-main);
-  background-color: var(--bg-alt);
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-.schedule-table td {
-  color: var(--text-muted);
-  background-color: var(--bg-card);
-  font-size: 0.85rem;
-}
-
-.schedule-table tr:last-child td {
-  border-bottom: none;
-}
-
-/* Schedule Note */
-.schedule-note {
-  color: var(--text-subtle);
-  font-size: 0.8rem;
-  margin-top: 0.75rem;
-}
-
 /* Bus and Driver Assignment */
 .assignment-grid {
   display: grid;
@@ -416,10 +229,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  padding: 1rem;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
 }
 
 .assignment-box strong {
@@ -428,13 +237,6 @@
 }
 
 /* Route Capacity */
-.capacity-box {
-  padding: 1rem;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-}
-
 .capacity-numbers {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -446,10 +248,6 @@
   display: block;
   color: var(--text-main);
   font-size: 0.9rem;
-}
-
-.no-seats {
-  color: #ef4444 !important;
 }
 
 .capacity-progress {
@@ -499,86 +297,7 @@
   margin-bottom: 1.25rem;
 }
 
-/* Call To Action */
-.cta-section {
-  background-color: var(--cta-bg);
-  border-block: 1px solid var(--border-cta);
-  padding: 4rem 1.5rem;
-  text-align: center;
-}
-
-.cta-container {
-  max-width: 650px;
-  margin: 0 auto;
-}
-
-.cta-title {
-  font-size: 2rem;
-  font-weight: 800;
-  color: var(--text-main);
-  margin-bottom: 0.75rem;
-}
-
-.cta-description {
-  font-size: 1.05rem;
-  color: var(--text-muted);
-  margin-bottom: 1.75rem;
-}
-
-.cta-actions {
-  display: flex;
-  justify-content: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-/* Footer */
-.footer {
-  background-color: var(--dark);
-  color: #94a3b8;
-  padding: 2.5rem 1.5rem 2rem;
-  margin-top: auto;
-}
-
-.footer-container {
-  max-width: 1140px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.footer-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #fff;
-}
-
-.footer-desc {
-  font-size: 0.875rem;
-  color: #94a3b8;
-}
-
-.footer-bottom {
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--border-color);
-  font-size: 0.8rem;
-  color: #94a3b8;
-  text-align: center;
-}
-
-
-
-
 @media (max-width: 768px) {
-  .hero-title {
-    font-size: 1.75rem;
-  }
-
-  .section {
-    padding: 3rem 1.25rem;
-  }
-
   .routes-grid {
     grid-template-columns: 1fr;
   }

@@ -1,0 +1,219 @@
+<div class="page-container">
+  <app-header />
+
+  <main class="subscription-main">
+    <section class="section" aria-labelledby="sub-page-title">
+      <div class="section-container">
+        <!-- Header -->
+        <div class="section-header">
+          <span class="section-badge">{{ t().navSubscription }}</span>
+          <h1 id="sub-page-title" class="section-title">{{ t().subPageTitle }}</h1>
+          <p class="section-subtitle">{{ t().subPageSubtitle }}</p>
+        </div>
+
+        @if (errorMessage()) {
+          <div class="alert alert-error" role="alert">
+            {{ errorMessage() }}
+          </div>
+        }
+
+        <!-- No Students Warning -->
+        @if (students().length === 0) {
+          <div class="card warning-card">
+            <h2 class="warning-title">{{ t().noRegisteredStudentsWarning }}</h2>
+            <div class="warning-action">
+              <a routerLink="/students" class="btn btn-primary btn-lg">
+                {{ t().registerStudentFirstBtn }}
+              </a>
+            </div>
+          </div>
+        } @else {
+          <div class="subscription-grid">
+            <!-- Form Section -->
+            <form [formGroup]="subForm" (ngSubmit)="onSubmit()" novalidate class="card sub-form-card">
+              <!-- Step 1: Select Student -->
+              <fieldset class="form-step">
+                <legend class="step-legend">{{ t().selectStudentStep }}</legend>
+                <div class="form-group">
+                  <label for="studentId" class="form-label">{{ t().studentNameLabel }}</label>
+                  <select
+                    id="studentId"
+                    formControlName="studentId"
+                    class="form-input"
+                    [class.input-error]="isFieldInvalid('studentId')"
+                  >
+                    <option [value]="0" disabled>{{ t().selectStudentPlaceholder }}</option>
+                    @for (student of students(); track student.studentId) {
+                      <option [value]="student.studentId">
+                        {{ student.fullName }} ({{ student.grade }} &bull; {{ student.className }})
+                      </option>
+                    }
+                  </select>
+                  @if (isFieldInvalid('studentId')) {
+                    <p class="field-error">{{ t().selectStudentPlaceholder }}</p>
+                  }
+                </div>
+              </fieldset>
+
+              <!-- Step 2: Select Route & Stop -->
+              <fieldset class="form-step">
+                <legend class="step-legend">{{ t().selectRouteStep }}</legend>
+                <div class="form-group">
+                  <label for="routeId" class="form-label">{{ t().selectRouteStep }}</label>
+                  <select
+                    id="routeId"
+                    formControlName="routeId"
+                    class="form-input"
+                    [class.input-error]="isFieldInvalid('routeId')"
+                  >
+                    <option [value]="0" disabled>{{ t().selectRoutePlaceholder }}</option>
+                    @for (r of routes(); track r.routeId) {
+                      <option [value]="r.routeId">
+                        {{ r.routeNumber }}: {{ r.name }} ({{ r.serviceArea }})
+                      </option>
+                    }
+                  </select>
+                  @if (isFieldInvalid('routeId')) {
+                    <p class="field-error">{{ t().selectRoutePlaceholder }}</p>
+                  }
+                </div>
+
+                <!-- Route Capacity Pill & Warning -->
+                @if (selectedRoute()) {
+                  <div class="capacity-box" [class.capacity-alert]="isRouteFull()">
+                    <span class="capacity-title">{{ t().routeCapacityLabel }}:</span>
+                    <strong class="capacity-count">{{ remainingSeats() }} / {{ selectedRoute()?.capacity }}</strong>
+                    @if (isRouteFull()) {
+                      <p class="capacity-warning-text">{{ t().routeFullWarning }}</p>
+                    }
+                  </div>
+                }
+
+                <!-- Step 3: Select Pickup Stop -->
+                <div class="form-group" style="margin-top: 1rem;">
+                  <label for="stopId" class="form-label">{{ t().selectStopStep }}</label>
+                  <select
+                    id="stopId"
+                    formControlName="stopId"
+                    class="form-input"
+                    [class.input-error]="isFieldInvalid('stopId')"
+                    [attr.disabled]="availableStops().length === 0 ? true : null"
+                  >
+                    <option [value]="0" disabled>{{ t().selectStopPlaceholder }}</option>
+                    @for (stop of availableStops(); track stop.stopId) {
+                      <option [value]="stop.stopId">
+                        {{ stop.name }} &bull; {{ t().pickupTimeLabel }}: {{ stop.pickupTime }}
+                      </option>
+                    }
+                  </select>
+                  @if (isFieldInvalid('stopId')) {
+                    <p class="field-error">{{ t().selectStopPlaceholder }}</p>
+                  }
+                </div>
+              </fieldset>
+
+              <!-- Step 4: Service Type Selection -->
+              <fieldset class="form-step">
+                <legend class="step-legend">{{ t().selectTypeStep }}</legend>
+                <div class="type-selector-grid">
+                  <button
+                    type="button"
+                    class="type-card"
+                    [class.type-card-selected]="subForm.get('transportType')?.value === 'RoundTrip'"
+                    (click)="selectTransportType('RoundTrip')"
+                  >
+                    <span class="type-title">{{ t().typeRoundTrip }}</span>
+                    <span class="type-desc">{{ t().typeRoundTripDesc }}</span>
+                    <strong class="type-price">40 JOD</strong>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="type-card"
+                    [class.type-card-selected]="subForm.get('transportType')?.value === 'OneWay'"
+                    (click)="selectTransportType('OneWay')"
+                  >
+                    <span class="type-title">{{ t().typeOneWay }}</span>
+                    <span class="type-desc">{{ t().typeOneWayDesc }}</span>
+                    <strong class="type-price">25 JOD</strong>
+                  </button>
+                </div>
+              </fieldset>
+
+              <!-- Submit Action -->
+              <div class="form-actions">
+                <button
+                  type="submit"
+                  class="btn btn-primary full-width btn-lg"
+                  [disabled]="isSubmitting() || isRouteFull()"
+                >
+                  @if (isSubmitting()) {
+                    <span>{{ t().submittingSubscriptionBtn }}</span>
+                  } @else {
+                    <span>{{ t().submitSubscriptionBtn }}</span>
+                  }
+                </button>
+              </div>
+            </form>
+
+            <!-- Order Summary Sidebar -->
+            <aside class="card summary-card" aria-labelledby="summary-heading">
+              <h2 id="summary-heading" class="summary-heading">{{ t().subFeeSummary }}</h2>
+
+              <div class="summary-list">
+                <div class="summary-item">
+                  <span class="summary-label">{{ t().studentNameLabel }}</span>
+                  <strong>{{ selectedStudent()?.fullName || 'Not selected' }}</strong>
+                </div>
+
+                <div class="summary-item">
+                  <span class="summary-label">{{ t().selectRouteStep }}</span>
+                  <strong>{{ selectedRoute()?.name || 'Not selected' }}</strong>
+                </div>
+
+                <div class="summary-item">
+                  <span class="summary-label">{{ t().selectedStopLabel }}</span>
+                  <strong>{{ selectedStop()?.name || 'Not selected' }}</strong>
+                </div>
+
+                <div class="summary-item">
+                  <span class="summary-label">{{ t().transportTypeLabel }}</span>
+                  <strong>
+                    {{ subForm.get('transportType')?.value === 'RoundTrip' ? t().typeRoundTrip : t().typeOneWay }}
+                  </strong>
+                </div>
+
+                <div class="summary-divider"></div>
+
+                <div class="summary-total">
+                  <span class="total-label">{{ t().monthlyFeeLabel }}</span>
+                  <div class="total-amount">
+                    <span class="amount-number">{{ calculatedFee() }}</span>
+                    <span class="amount-currency">JOD</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="summary-notice">
+                <p>{{ t().subConditionsNotice }}</p>
+              </div>
+            </aside>
+          </div>
+        }
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <span class="footer-title">{{ t().officeName }}</span>
+        <p class="footer-desc">{{ t().officeDesc }}</p>
+      </div>
+      <div class="footer-bottom">
+        <p>{{ t().footerCopyright }}</p>
+      </div>
+    </div>
+  </footer>
+</div>
+

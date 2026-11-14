@@ -30,4 +30,37 @@ export const routes: Routes = [
     path: 'login',
     loadComponent: () => import('./login/login').then((m) => m.Login),
   },
+  {
+    path: 'students',
+    loadComponent: () =>
+      import('./students/student-registration/student-registration').then(
+        (m) => m.StudentRegistration
+      ),
+  },
+  {
+    path: 'student-registration',
+    redirectTo: 'students',
+    pathMatch: 'full',
+  },
+  {
+    path: 'subscription',
+    loadComponent: () =>
+      import(
+        './transportation-subscription/transportation-subscription'
+      ).then((m) => m.TransportationSubscription),
+  },
+  {
+    path: 'subscription-confirmation/:reference',
+    loadComponent: () =>
+      import('./subscription-confirmation/subscription-confirmation').then(
+        (m) => m.SubscriptionConfirmation
+      ),
+  },
+  {
+    path: 'subscription-confirmation',
+    loadComponent: () =>
+      import('./subscription-confirmation/subscription-confirmation').then(
+        (m) => m.SubscriptionConfirmation
+      ),
+  },
 ];
