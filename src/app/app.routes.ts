@@ -45,9 +45,9 @@ export const routes: Routes = [
   {
     path: 'subscription',
     loadComponent: () =>
-      import(
-        './transportation-subscription/transportation-subscription'
-      ).then((m) => m.TransportationSubscription),
+      import('./transportation-subscription/transportation-subscription').then(
+        (m) => m.TransportationSubscription
+      ),
   },
   {
     path: 'subscription-confirmation/:reference',
@@ -62,5 +62,15 @@ export const routes: Routes = [
       import('./subscription-confirmation/subscription-confirmation').then(
         (m) => m.SubscriptionConfirmation
       ),
+  },
+  {
+    path: 'my-transportation',
+    loadComponent: () =>
+      import('./my-transportation/my-transportation').then((m) => m.MyTransportation),
+  },
+  {
+    path: 'payment-status',
+    loadComponent: () =>
+      import('./payment-status/payment-status').then((m) => m.PaymentStatus),
   },
 ];

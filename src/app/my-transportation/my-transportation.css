@@ -1,0 +1,361 @@
+
+.transportation-main {
+  min-height: calc(100vh - 80px);
+}
+
+.page-heading {
+  text-align: center;
+  max-width: 850px;
+  margin: 0 auto 3rem;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 2.5rem;
+}
+
+.summary-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.summary-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: var(--bg-alt);
+  font-size: 1.5rem;
+}
+
+.summary-card p {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.summary-card h2 {
+  color: var(--text-main);
+  font-size: 1.7rem;
+  margin: 0;
+}
+
+.content-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.content-heading h2 {
+  color: var(--text-main);
+  font-size: 1.4rem;
+}
+
+.subscription-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.subscription-card {
+  padding: 1.75rem;
+  background: var(--bg-card);
+}
+
+.subscription-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.reference-label,
+.info-item span,
+.fee-info span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+
+.reference-number {
+  color: var(--primary-text);
+  font-size: 1rem;
+}
+
+.status-badge {
+  padding: 0.45rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: var(--bg-alt);
+  color: var(--text-main);
+}
+
+.status-approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.student-heading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.student-avatar {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  background: var(--bg-alt);
+  border-radius: 50%;
+  font-size: 1.4rem;
+}
+
+.student-heading h3 {
+  color: var(--text-main);
+  margin-bottom: 0.3rem;
+}
+
+.student-heading p {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.subscription-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  padding: 1.25rem 0;
+}
+
+.info-item strong {
+  color: var(--text-main);
+  font-size: 0.95rem;
+}
+
+.subscription-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.fee-info strong {
+  color: var(--primary-text);
+  font-size: 1.3rem;
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+  border: 1px solid #dc2626;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
+.empty-card {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  max-width: 700px;
+  margin: 1.5rem auto;
+}
+
+.empty-card h2 {
+  color: var(--text-main);
+  margin-bottom: 0.75rem;
+}
+
+.empty-card p {
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.alert {
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.success-alert {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.error-alert {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+  overflow-y: auto;
+}
+
+.details-modal {
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 2rem;
+  background: var(--bg-card);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.modal-header h2 {
+  color: var(--text-main);
+}
+
+.close-button {
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 2rem;
+  cursor: pointer;
+}
+
+.modal-details p {
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+
+.modal-details strong {
+  color: var(--text-muted);
+}
+
+.details-modal label {
+  display: block;
+  color: var(--text-main);
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+}
+
+.details-modal textarea {
+  display: block;
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-main);
+  color: var(--text-main);
+  font: inherit;
+  resize: vertical;
+  margin-bottom: 1rem;
+}
+
+.request-reference {
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.full-width {
+  width: 100%;
+}
+
+:host-context([dir="rtl"]) .page-heading {
+  direction: rtl;
+}
+
+:host-context([dir="rtl"]) .subscription-card,
+:host-context([dir="rtl"]) .details-modal {
+  direction: rtl;
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .subscription-info-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .content-heading,
+  .subscription-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .subscription-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card-actions {
+    flex-direction: column;
+  }
+
+  .card-actions .btn {
+    width: 100%;
+  }
+
+  .subscription-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

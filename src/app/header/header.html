@@ -1,3 +1,4 @@
+
 <header class="header">
   <div class="header-inner">
     <a routerLink="/" class="brand" aria-label="Basi School Transportation Home">
@@ -12,15 +13,32 @@
     </a>
 
     @if (variant() === 'full') {
-      <!-- Desktop Navigation Menu -->
       <nav class="nav-menu" aria-label="Main Navigation">
-        <a routerLink="/transport" class="nav-link">{{ t().navServices }}</a>
-        <a routerLink="/routes" class="nav-link">{{ t().navRoutesSafety }}</a>
-        <a routerLink="/students" class="nav-link">{{ t().navStudents }}</a>
-        <a routerLink="/subscription" class="nav-link">{{ t().navSubscription }}</a>
+        <a routerLink="/transport" class="nav-link">
+          {{ t().navServices }}
+        </a>
+
+        <a routerLink="/routes" class="nav-link">
+          {{ t().navRoutesSafety }}
+        </a>
+
+        <a routerLink="/students" class="nav-link">
+          {{ t().navStudents }}
+        </a>
+
+        <a routerLink="/subscription" class="nav-link">
+          {{ t().navSubscription }}
+        </a>
+
+        <a routerLink="/my-transportation" class="nav-link">
+          {{ prefs.lang() === 'ar' ? 'تفاصيل النقل' : 'My Transportation' }}
+        </a>
+
+        <a routerLink="/payment-status" class="nav-link">
+          {{ prefs.lang() === 'ar' ? 'حالة الدفع' : 'Payment Status' }}
+        </a>
       </nav>
 
-      <!-- Auth Actions & Preference Controls -->
       <div class="nav-auth">
         <div class="header-controls">
           <button
@@ -32,6 +50,7 @@
           >
             {{ prefs.lang() === 'en' ? 'العربية' : 'EN' }}
           </button>
+
           <button
             type="button"
             class="btn-icon"
@@ -43,15 +62,15 @@
           </button>
         </div>
 
-        <a routerLink="/login" class="btn btn-outline" aria-label="Log in to account">
+        <a routerLink="/login" class="btn btn-outline">
           {{ t().navLogin }}
         </a>
-        <a routerLink="/register" class="btn btn-primary" aria-label="Register for transportation">
+
+        <a routerLink="/register" class="btn btn-primary">
           {{ t().navRegister }}
         </a>
       </div>
 
-      <!-- Mobile Hamburger Button -->
       <button
         type="button"
         class="menu-toggle"
@@ -64,7 +83,6 @@
         <span class="menu-bar"></span>
       </button>
     } @else {
-      <!-- Minimal Controls for Auth Pages -->
       <div class="header-controls">
         <button
           type="button"
@@ -75,6 +93,7 @@
         >
           {{ prefs.lang() === 'en' ? 'العربية' : 'EN' }}
         </button>
+
         <button
           type="button"
           class="btn-icon"
@@ -88,13 +107,32 @@
     }
   </div>
 
-  <!-- Mobile Navigation Drawer -->
   @if (variant() === 'full' && isMenuOpen()) {
     <nav class="mobile-nav" aria-label="Mobile Navigation">
-      <a routerLink="/transport" class="mobile-link" (click)="closeMenu()">{{ t().navServices }}</a>
-      <a routerLink="/routes" class="mobile-link" (click)="closeMenu()">{{ t().navRoutesSafety }}</a>
-      <a routerLink="/students" class="mobile-link" (click)="closeMenu()">{{ t().navStudents }}</a>
-      <a routerLink="/subscription" class="mobile-link" (click)="closeMenu()">{{ t().navSubscription }}</a>
+
+      <a routerLink="/transport" class="mobile-link" (click)="closeMenu()">
+        {{ t().navServices }}
+      </a>
+
+      <a routerLink="/routes" class="mobile-link" (click)="closeMenu()">
+        {{ t().navRoutesSafety }}
+      </a>
+
+      <a routerLink="/students" class="mobile-link" (click)="closeMenu()">
+        {{ t().navStudents }}
+      </a>
+
+      <a routerLink="/subscription" class="mobile-link" (click)="closeMenu()">
+        {{ t().navSubscription }}
+      </a>
+
+      <a routerLink="/my-transportation" class="mobile-link" (click)="closeMenu()">
+        {{ prefs.lang() === 'ar' ? 'تفاصيل النقل' : 'My Transportation' }}
+      </a>
+
+      <a routerLink="/payment-status" class="mobile-link" (click)="closeMenu()">
+        {{ prefs.lang() === 'ar' ? 'حالة الدفع' : 'Payment Status' }}
+      </a>
 
       <div class="header-controls mobile-controls">
         <button
@@ -104,6 +142,7 @@
         >
           {{ prefs.lang() === 'en' ? 'العربية' : 'English' }}
         </button>
+
         <button
           type="button"
           class="btn-icon"
@@ -117,6 +156,7 @@
         <a routerLink="/login" class="btn btn-outline full-width" (click)="closeMenu()">
           {{ t().navLogin }}
         </a>
+
         <a routerLink="/register" class="btn btn-primary full-width" (click)="closeMenu()">
           {{ t().navRegister }}
         </a>
@@ -124,4 +164,3 @@
     </nav>
   }
 </header>
-

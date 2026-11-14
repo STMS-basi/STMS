@@ -1,4 +1,6 @@
-import { Injectable, signal } from '@angular/core';
+
+import { Injectable, inject, signal } from '@angular/core';
+import { AuthService } from './auth.service';
 
 export type TransportType = 'OneWay' | 'RoundTrip';
 export type SubscriptionStatus = 'Pending' | 'Approved' | 'Rejected' | 'Cancelled';
@@ -22,6 +24,7 @@ export interface SubscriptionItem {
   readonly startDate: string;
   readonly endDate: string;
   readonly requestedAt: string;
+  readonly parentEmail?: string;
 }
 
 export interface CreateSubscriptionPayload {
@@ -47,13 +50,19 @@ const STORAGE_SUBSCRIPTIONS_KEY = 'stms_subscriptions';
   providedIn: 'root',
 })
 export class SubscriptionService {
-  private readonly subscriptionsSignal = signal<SubscriptionItem[]>(this.loadStoredSubscriptions());
+  private readonly authService = inject(AuthService);
+
+  private readonly subscriptionsSignal = signal<SubscriptionItem[]>(
+    this.loadStoredSubscriptions()
+  );
+
   public readonly subscriptions = this.subscriptionsSignal.asReadonly();
 
   private loadStoredSubscriptions(): SubscriptionItem[] {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         const stored = localStorage.getItem(STORAGE_SUBSCRIPTIONS_KEY);
+
         if (stored) {
           return JSON.parse(stored) as SubscriptionItem[];
         }
@@ -61,13 +70,17 @@ export class SubscriptionService {
     } catch {
       // Ignore storage errors
     }
+
     return [];
   }
 
   private persist(items: SubscriptionItem[]): void {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem(STORAGE_SUBSCRIPTIONS_KEY, JSON.stringify(items));
+        localStorage.setItem(
+          STORAGE_SUBSCRIPTIONS_KEY,
+          JSON.stringify(items)
+        );
       }
     } catch {
       // Ignore storage errors
@@ -79,13 +92,19 @@ export class SubscriptionService {
     return `SUB 2026 ${randomDigits}`;
   }
 
-  public createSubscription(payload: CreateSubscriptionPayload): SubscriptionItem {
+  public createSubscription(
+    payload: CreateSubscriptionPayload
+  ): SubscriptionItem {
     const id = Date.now();
     const referenceNumber = this.generateReferenceNumber();
     const requestedAt = new Date().toISOString();
 
     const today = new Date();
-    const termEnd = new Date(today.getFullYear(), today.getMonth() + 4, 1);
+    const termEnd = new Date(
+      today.getFullYear(),
+      today.getMonth() + 4,
+      1
+    );
 
     const newSub: SubscriptionItem = {
       subscriptionId: id,
@@ -103,27 +122,39 @@ export class SubscriptionService {
       transportType: payload.transportType,
       fee: payload.fee,
       status: 'Pending',
-      startDate: payload.startDate ?? today.toISOString().split('T')[0],
-      endDate: payload.endDate ?? termEnd.toISOString().split('T')[0],
+      startDate:
+        payload.startDate ?? today.toISOString().split('T')[0],
+      endDate:
+        payload.endDate ?? termEnd.toISOString().split('T')[0],
       requestedAt,
+      parentEmail: this.authService.userEmail()?.toLowerCase() ?? '',
     };
 
-    const updated = [newSub, ...this.subscriptionsSignal()];
+    const updated = [
+      newSub,
+      ...this.subscriptionsSignal(),
+    ];
+
     this.subscriptionsSignal.set(updated);
     this.persist(updated);
 
     return newSub;
   }
 
-  public getByReference(referenceNumber: string): SubscriptionItem | undefined {
+  public getByReference(
+    referenceNumber: string
+  ): SubscriptionItem | undefined {
     const cleaned = referenceNumber.trim().toUpperCase();
+
     return this.subscriptionsSignal().find(
-      (sub) => sub.referenceNumber.trim().toUpperCase() === cleaned
+      (sub) =>
+        sub.referenceNumber.trim().toUpperCase() === cleaned
     );
   }
 
   public getById(id: number): SubscriptionItem | undefined {
-    return this.subscriptionsSignal().find((sub) => sub.subscriptionId === id);
+    return this.subscriptionsSignal().find(
+      (sub) => sub.subscriptionId === id
+    );
   }
 }
-

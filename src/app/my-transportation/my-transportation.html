@@ -1,0 +1,348 @@
+
+<div class="page-container">
+  <app-header />
+
+  <main class="transportation-main">
+    <section class="section">
+      <div class="section-container">
+
+        <div class="page-heading">
+          <span class="section-badge">
+            {{ prefs.lang() === 'ar' ? 'خدمات النقل' : 'Transportation' }}
+          </span>
+
+          <h1 class="section-title">
+            {{ prefs.lang() === 'ar' ? 'تفاصيل النقل الخاصة بي' : 'My Transportation Details' }}
+          </h1>
+
+          <p class="section-subtitle">
+            {{ prefs.lang() === 'ar'
+              ? 'عرض وإدارة اشتراكات النقل المدرسي الخاصة بأطفالك.'
+              : 'View and manage your children’s school transportation subscriptions.' }}
+          </p>
+        </div>
+
+        @if (!isLoggedIn()) {
+          <div class="card empty-card">
+            <h2>
+              {{ prefs.lang() === 'ar' ? 'تسجيل الدخول مطلوب' : 'Login Required' }}
+            </h2>
+
+            <p>
+              {{ prefs.lang() === 'ar'
+                ? 'يرجى تسجيل الدخول لعرض اشتراكات النقل الخاصة بك.'
+                : 'Please log in to view your transportation subscriptions.' }}
+            </p>
+
+            <a routerLink="/login" class="btn btn-primary">
+              {{ t().navLogin }}
+            </a>
+          </div>
+        } @else {
+
+          <div class="summary-grid">
+
+            <div class="summary-card">
+              <span class="summary-icon">🚌</span>
+              <div>
+                <p>
+                  {{ prefs.lang() === 'ar' ? 'إجمالي الاشتراكات' : 'Total Subscriptions' }}
+                </p>
+                <h2>{{ totalSubscriptions() }}</h2>
+              </div>
+            </div>
+
+            <div class="summary-card">
+              <span class="summary-icon">✓</span>
+              <div>
+                <p>
+                  {{ prefs.lang() === 'ar' ? 'الاشتراكات المعتمدة' : 'Approved Subscriptions' }}
+                </p>
+                <h2>{{ activeSubscriptions() }}</h2>
+              </div>
+            </div>
+
+            <div class="summary-card">
+              <span class="summary-icon">◷</span>
+              <div>
+                <p>
+                  {{ prefs.lang() === 'ar' ? 'الاشتراكات المعلقة' : 'Pending Subscriptions' }}
+                </p>
+                <h2>{{ pendingSubscriptions() }}</h2>
+              </div>
+            </div>
+
+          </div>
+
+          @if (successMessage()) {
+            <div class="alert success-alert">
+              {{ successMessage() }}
+            </div>
+          }
+
+          @if (errorMessage()) {
+            <div class="alert error-alert">
+              {{ errorMessage() }}
+            </div>
+          }
+
+          <div class="content-heading">
+            <h2>
+              {{ prefs.lang() === 'ar' ? 'اشتراكات النقل الخاصة بي' : 'My Subscriptions' }}
+            </h2>
+
+            <a routerLink="/subscription" class="btn btn-primary">
+              + {{ prefs.lang() === 'ar' ? 'اشتراك جديد' : 'New Subscription' }}
+            </a>
+          </div>
+
+          @if (subscriptions().length === 0) {
+            <div class="card empty-card">
+              <div class="empty-icon">🚌</div>
+
+              <h2>
+                {{ prefs.lang() === 'ar' ? 'لا توجد اشتراكات حتى الآن' : 'No Subscriptions Yet' }}
+              </h2>
+
+              <p>
+                {{ prefs.lang() === 'ar'
+                  ? 'لم يتم العثور على اشتراكات مرتبطة بحسابك.'
+                  : 'There are no transportation subscriptions associated with your account.' }}
+              </p>
+
+              <a routerLink="/subscription" class="btn btn-primary">
+                {{ prefs.lang() === 'ar' ? 'طلب اشتراك نقل' : 'Request Transportation' }}
+              </a>
+            </div>
+          } @else {
+
+            <div class="subscription-list">
+
+              @for (sub of subscriptions(); track sub.subscriptionId) {
+                <article class="subscription-card card">
+
+                  <div class="subscription-top">
+                    <div>
+                      <span class="reference-label">
+                        {{ prefs.lang() === 'ar' ? 'رقم الاشتراك' : 'Subscription Reference' }}
+                      </span>
+
+                      <strong class="reference-number">
+                        {{ sub.referenceNumber }}
+                      </strong>
+                    </div>
+
+                    <span
+                      class="status-badge"
+                      [class.status-approved]="sub.status === 'Approved'"
+                      [class.status-pending]="sub.status === 'Pending'"
+                      [class.status-rejected]="sub.status === 'Rejected' || sub.status === 'Cancelled'"
+                    >
+                      {{ statusText(sub.status) }}
+                    </span>
+                  </div>
+
+                  <div class="student-heading">
+                    <span class="student-avatar">👨‍🎓</span>
+                    <div>
+                      <h3>{{ sub.studentName }}</h3>
+                      <p>{{ sub.studentGrade }}</p>
+                    </div>
+                  </div>
+
+                  <div class="subscription-info-grid">
+
+                    <div class="info-item">
+                      <span>
+                        {{ prefs.lang() === 'ar' ? 'المسار' : 'Route' }}
+                      </span>
+                      <strong>{{ sub.routeNumber }} - {{ sub.routeName }}</strong>
+                    </div>
+
+                    <div class="info-item">
+                      <span>
+                        {{ prefs.lang() === 'ar' ? 'نقطة الاصطحاب' : 'Pickup Stop' }}
+                      </span>
+                      <strong>{{ sub.stopName }}</strong>
+                    </div>
+
+                    <div class="info-item">
+                      <span>
+                        {{ prefs.lang() === 'ar' ? 'الاصطحاب الصباحي' : 'Morning Pickup' }}
+                      </span>
+                      <strong>{{ sub.pickupTime }}</strong>
+                    </div>
+
+                    <div class="info-item">
+                      <span>
+                        {{ prefs.lang() === 'ar' ? 'العودة بعد الظهر' : 'Afternoon Drop-off' }}
+                      </span>
+                      <strong>{{ sub.dropoffTime }}</strong>
+                    </div>
+
+                    <div class="info-item">
+                      <span>
+                        {{ prefs.lang() === 'ar' ? 'بداية الاشتراك' : 'Start Date' }}
+                      </span>
+                      <strong>{{ sub.startDate | date:'mediumDate' }}</strong>
+                    </div>
+
+                    <div class="info-item">
+                      <span>
+                        {{ prefs.lang() === 'ar' ? 'نهاية الاشتراك' : 'End Date' }}
+                      </span>
+                      <strong>{{ sub.endDate | date:'mediumDate' }}</strong>
+                    </div>
+
+                  </div>
+
+                  <div class="subscription-footer">
+                    <div class="fee-info">
+                      <span>
+                        {{ prefs.lang() === 'ar' ? 'الرسوم الشهرية' : 'Monthly Fee' }}
+                      </span>
+                      <strong>{{ sub.fee }} JOD</strong>
+                    </div>
+
+                    <div class="card-actions">
+                      <button
+                        type="button"
+                        class="btn btn-outline"
+                        (click)="viewDetails(sub)"
+                      >
+                        {{ prefs.lang() === 'ar' ? 'عرض التفاصيل' : 'View Details' }}
+                      </button>
+
+                      @if (sub.status !== 'Cancelled' && sub.status !== 'Rejected') {
+                        <button
+                          type="button"
+                          class="btn btn-secondary"
+                          (click)="openRequest(sub, 'Modification')"
+                        >
+                          {{ prefs.lang() === 'ar' ? 'طلب تعديل' : 'Request Modification' }}
+                        </button>
+
+                        <button
+                          type="button"
+                          class="btn btn-danger"
+                          (click)="openRequest(sub, 'Cancellation')"
+                        >
+                          {{ prefs.lang() === 'ar' ? 'طلب إلغاء' : 'Request Cancellation' }}
+                        </button>
+                      }
+                    </div>
+                  </div>
+
+                </article>
+              }
+
+            </div>
+          }
+
+          @if (selectedSubscription(); as sub) {
+            <div class="modal-overlay" (click)="closeDetails()">
+              <div
+                class="details-modal card"
+                role="dialog"
+                aria-modal="true"
+                (click)="$event.stopPropagation()"
+              >
+                <div class="modal-header">
+                  <h2>
+                    {{ prefs.lang() === 'ar' ? 'تفاصيل الاشتراك' : 'Subscription Details' }}
+                  </h2>
+
+                  <button type="button" class="close-button" (click)="closeDetails()">
+                    ×
+                  </button>
+                </div>
+
+                <div class="modal-details">
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'الطالب:' : 'Student:' }}</strong> {{ sub.studentName }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'المرجع:' : 'Reference:' }}</strong> {{ sub.referenceNumber }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'المسار:' : 'Route:' }}</strong> {{ sub.routeNumber }} - {{ sub.routeName }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'نقطة الاصطحاب:' : 'Pickup Stop:' }}</strong> {{ sub.stopName }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'نوع النقل:' : 'Transport Type:' }}</strong> {{ sub.transportType === 'RoundTrip' ? (prefs.lang() === 'ar' ? 'ذهاب وإياب' : 'Round Trip') : (prefs.lang() === 'ar' ? 'اتجاه واحد' : 'One Way') }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'الحالة:' : 'Status:' }}</strong> {{ statusText(sub.status) }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'الحافلة:' : 'Assigned Bus:' }}</strong> {{ prefs.lang() === 'ar' ? 'لم يتم التعيين بعد' : 'Not assigned yet' }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'السائق:' : 'Assigned Driver:' }}</strong> {{ prefs.lang() === 'ar' ? 'لم يتم التعيين بعد' : 'Not assigned yet' }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'الفترة:' : 'Subscription Period:' }}</strong> {{ sub.startDate | date:'mediumDate' }} - {{ sub.endDate | date:'mediumDate' }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'الرسوم:' : 'Fee:' }}</strong> {{ sub.fee }} JOD</p>
+                </div>
+
+                <button class="btn btn-primary full-width" (click)="closeDetails()">
+                  {{ prefs.lang() === 'ar' ? 'إغلاق' : 'Close' }}
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (requestPanelSubscription(); as sub) {
+            <div class="modal-overlay">
+              <div class="details-modal card" role="dialog" aria-modal="true">
+
+                <div class="modal-header">
+                  <h2>
+                    {{ requestType() === 'Cancellation'
+                      ? (prefs.lang() === 'ar' ? 'طلب إلغاء الاشتراك' : 'Cancellation Request')
+                      : (prefs.lang() === 'ar' ? 'طلب تعديل الاشتراك' : 'Modification Request') }}
+                  </h2>
+
+                  <button type="button" class="close-button" (click)="closeRequest()">×</button>
+                </div>
+
+                <p class="request-reference">
+                  {{ sub.referenceNumber }} - {{ sub.studentName }}
+                </p>
+
+                <label for="requestMessage">
+                  {{ prefs.lang() === 'ar' ? 'سبب الطلب والتفاصيل' : 'Reason and Request Details' }}
+                </label>
+
+                <textarea
+                  id="requestMessage"
+                  rows="5"
+                  [value]="requestMessage()"
+                  (input)="requestMessage.set($any($event.target).value)"
+                  [placeholder]="prefs.lang() === 'ar'
+                    ? 'اكتب سبب طلبك هنا...'
+                    : 'Explain your request here...'"
+                ></textarea>
+
+                @if (errorMessage()) {
+                  <div class="alert error-alert">{{ errorMessage() }}</div>
+                }
+
+                <div class="modal-actions">
+                  <button type="button" class="btn btn-outline" (click)="closeRequest()">
+                    {{ prefs.lang() === 'ar' ? 'إلغاء' : 'Back' }}
+                  </button>
+
+                  <button type="button" class="btn btn-primary" (click)="submitRequest()">
+                    {{ prefs.lang() === 'ar' ? 'إرسال الطلب' : 'Submit Request' }}
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          }
+
+        }
+
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <span class="footer-title">{{ t().officeName }}</span>
+        <p class="footer-desc">{{ t().officeDesc }}</p>
+      </div>
+
+      <div class="footer-bottom">
+        <p>{{ t().footerCopyright }}</p>
+      </div>
+    </div>
+  </footer>
+</div>

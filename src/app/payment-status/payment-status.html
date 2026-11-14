@@ -1,0 +1,350 @@
+
+<div class="page-container">
+  <app-header />
+
+  <main class="payment-main">
+    <section class="section">
+      <div class="section-container">
+
+        <div class="page-heading">
+          <span class="section-badge">
+            {{ prefs.lang() === 'ar' ? 'المدفوعات' : 'Payments' }}
+          </span>
+
+          <h1 class="section-title">
+            {{ prefs.lang() === 'ar' ? 'حالة الدفع' : 'Payment Status' }}
+          </h1>
+
+          <p class="section-subtitle">
+            {{ prefs.lang() === 'ar'
+              ? 'تابع رسوم اشتراكات النقل وسجلات الدفع الخاصة بأطفالك.'
+              : 'Track your children’s transportation fees and payment records.' }}
+          </p>
+        </div>
+
+        @if (!isLoggedIn()) {
+          <div class="card empty-card">
+            <h2>
+              {{ prefs.lang() === 'ar' ? 'تسجيل الدخول مطلوب' : 'Login Required' }}
+            </h2>
+
+            <p>
+              {{ prefs.lang() === 'ar'
+                ? 'يرجى تسجيل الدخول لعرض معلومات الدفع.'
+                : 'Please log in to view your payment information.' }}
+            </p>
+
+            <a routerLink="/login" class="btn btn-primary">
+              {{ t().navLogin }}
+            </a>
+          </div>
+        } @else {
+
+          <div class="payment-summary-grid">
+
+            <div class="payment-summary-card">
+              <span class="payment-icon">📄</span>
+
+              <div>
+                <p>
+                  {{ prefs.lang() === 'ar' ? 'إجمالي الرسوم المستحقة' : 'Total Amount Due' }}
+                </p>
+
+                <h2>{{ totalDue() }} <small>JOD</small></h2>
+              </div>
+            </div>
+
+            <div class="payment-summary-card">
+              <span class="payment-icon">✓</span>
+
+              <div>
+                <p>
+                  {{ prefs.lang() === 'ar' ? 'إجمالي المبلغ المسجل كمدفوع' : 'Total Amount Recorded as Paid' }}
+                </p>
+
+                <h2>{{ totalPaid() }} <small>JOD</small></h2>
+              </div>
+            </div>
+
+            <div class="payment-summary-card outstanding-card">
+              <span class="payment-icon">!</span>
+
+              <div>
+                <p>
+                  {{ prefs.lang() === 'ar' ? 'الرصيد المستحق حسب السجلات' : 'Outstanding Balance in Portal' }}
+                </p>
+
+                <h2>{{ totalOutstanding() }} <small>JOD</small></h2>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="administration-notice">
+            <span class="notice-icon">ℹ</span>
+
+            <div>
+              <h3>
+                {{ prefs.lang() === 'ar'
+                  ? 'الدفع من خلال إدارة المدرسة'
+                  : 'Payment Managed by School Administration' }}
+              </h3>
+
+              <p>
+                {{ prefs.lang() === 'ar'
+                  ? 'لا تتم معالجة المدفوعات عبر الإنترنت في هذا النظام. تقوم إدارة المدرسة بتسجيل وتحديث حالات الدفع. يرجى مراجعة الإدارة لتأكيد المبالغ المدفوعة والرصيد المستحق.'
+                  : 'Online payments are not processed through this system. The school administration records and updates payment statuses. Please contact the administration to confirm payments and outstanding balances.' }}
+              </p>
+            </div>
+          </div>
+
+          <div class="records-heading">
+            <h2>
+              {{ prefs.lang() === 'ar' ? 'سجلات الدفع' : 'Payment Records' }}
+            </h2>
+
+            <span class="record-count">
+              {{ payments().length }}
+              {{ prefs.lang() === 'ar' ? 'سجل' : 'Records' }}
+            </span>
+          </div>
+
+          @if (payments().length === 0) {
+            <div class="card empty-card">
+              <div class="empty-icon">📄</div>
+
+              <h2>
+                {{ prefs.lang() === 'ar' ? 'لا توجد سجلات دفع' : 'No Payment Records' }}
+              </h2>
+
+              <p>
+                {{ prefs.lang() === 'ar'
+                  ? 'لا توجد اشتراكات مرتبطة بحسابك لعرض سجلات الدفع.'
+                  : 'There are no subscriptions associated with your account to display payment records.' }}
+              </p>
+
+              <a routerLink="/subscription" class="btn btn-primary">
+                {{ prefs.lang() === 'ar' ? 'طلب اشتراك نقل' : 'Request Transportation' }}
+              </a>
+            </div>
+          } @else {
+
+            <div class="payment-records">
+
+              @for (payment of payments(); track payment.subscription.subscriptionId) {
+                <article class="payment-card card">
+
+                  <div class="payment-card-header">
+                    <div>
+                      <span class="record-label">
+                        {{ prefs.lang() === 'ar' ? 'رقم الاشتراك' : 'Subscription Reference' }}
+                      </span>
+
+                      <strong>
+                        {{ payment.subscription.referenceNumber }}
+                      </strong>
+                    </div>
+
+                    <span class="payment-status">
+                      {{ paymentStatusText() }}
+                    </span>
+                  </div>
+
+                  <div class="payment-student">
+                    <div>
+                      <span class="record-label">
+                        {{ prefs.lang() === 'ar' ? 'الطالب' : 'Student' }}
+                      </span>
+
+                      <h3>{{ payment.subscription.studentName }}</h3>
+                    </div>
+
+                    <div>
+                      <span class="record-label">
+                        {{ prefs.lang() === 'ar' ? 'المسار' : 'Route' }}
+                      </span>
+
+                      <strong>
+                        {{ payment.subscription.routeNumber }} - {{ payment.subscription.routeName }}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div class="payment-amounts">
+
+                    <div class="amount-item">
+                      <span>
+                        {{ prefs.lang() === 'ar' ? 'المبلغ المستحق' : 'Amount Due' }}
+                      </span>
+
+                      <strong>{{ payment.amountDue }} JOD</strong>
+                    </div>
+
+                    <div class="amount-item">
+                      <span>
+                        {{ prefs.lang() === 'ar' ? 'المبلغ المدفوع المسجل' : 'Recorded Amount Paid' }}
+                      </span>
+
+                      <strong class="paid-amount">
+                        {{ payment.amountPaid }} JOD
+                      </strong>
+                    </div>
+
+                    <div class="amount-item">
+                      <span>
+                        {{ prefs.lang() === 'ar' ? 'الرصيد المستحق' : 'Outstanding Balance' }}
+                      </span>
+
+                      <strong class="balance-amount">
+                        {{ payment.outstandingBalance }} JOD
+                      </strong>
+                    </div>
+
+                  </div>
+
+                  <div class="period-info">
+                    <div>
+                      <span class="record-label">
+                        {{ prefs.lang() === 'ar' ? 'بداية الفترة' : 'Period Start' }}
+                      </span>
+
+                      <strong>
+                        {{ payment.subscription.startDate | date:'mediumDate' }}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span class="record-label">
+                        {{ prefs.lang() === 'ar' ? 'نهاية الفترة' : 'Period End' }}
+                      </span>
+
+                      <strong>
+                        {{ payment.subscription.endDate | date:'mediumDate' }}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div class="payment-card-footer">
+                    <span class="administration-label">
+                      {{ prefs.lang() === 'ar'
+                        ? 'يتم تحديث حالة الدفع من قبل الإدارة'
+                        : 'Payment status updated by administration' }}
+                    </span>
+
+                    <button
+                      type="button"
+                      class="btn btn-outline"
+                      (click)="viewPaymentDetails(payment)"
+                    >
+                      {{ prefs.lang() === 'ar' ? 'عرض التفاصيل' : 'View Details' }}
+                    </button>
+                  </div>
+
+                </article>
+              }
+
+            </div>
+          }
+
+          @if (selectedPayment(); as payment) {
+            <div class="modal-overlay" (click)="closePaymentDetails()">
+
+              <div
+                class="payment-modal card"
+                role="dialog"
+                aria-modal="true"
+                (click)="$event.stopPropagation()"
+              >
+
+                <div class="modal-header">
+                  <h2>
+                    {{ prefs.lang() === 'ar' ? 'تفاصيل الدفع' : 'Payment Details' }}
+                  </h2>
+
+                  <button
+                    type="button"
+                    class="close-button"
+                    (click)="closePaymentDetails()"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div class="modal-details">
+
+                  <p>
+                    <strong>{{ prefs.lang() === 'ar' ? 'رقم الاشتراك:' : 'Subscription Reference:' }}</strong>
+                    {{ payment.subscription.referenceNumber }}
+                  </p>
+
+                  <p>
+                    <strong>{{ prefs.lang() === 'ar' ? 'اسم الطالب:' : 'Student Name:' }}</strong>
+                    {{ payment.subscription.studentName }}
+                  </p>
+
+                  <p>
+                    <strong>{{ prefs.lang() === 'ar' ? 'الرسوم المستحقة:' : 'Amount Due:' }}</strong>
+                    {{ payment.amountDue }} JOD
+                  </p>
+
+                  <p>
+                    <strong>{{ prefs.lang() === 'ar' ? 'المبلغ المدفوع المسجل:' : 'Recorded Amount Paid:' }}</strong>
+                    {{ payment.amountPaid }} JOD
+                  </p>
+
+                  <p>
+                    <strong>{{ prefs.lang() === 'ar' ? 'الرصيد المستحق:' : 'Outstanding Balance:' }}</strong>
+                    {{ payment.outstandingBalance }} JOD
+                  </p>
+
+                  <p>
+                    <strong>{{ prefs.lang() === 'ar' ? 'الفترة:' : 'Subscription Period:' }}</strong>
+                    {{ payment.subscription.startDate | date:'mediumDate' }}
+                    -
+                    {{ payment.subscription.endDate | date:'mediumDate' }}
+                  </p>
+
+                  <p>
+                    <strong>{{ prefs.lang() === 'ar' ? 'حالة الدفع:' : 'Payment Status:' }}</strong>
+                    {{ paymentStatusText() }}
+                  </p>
+
+                  <div class="modal-notice">
+                    {{ prefs.lang() === 'ar'
+                      ? 'يرجى التواصل مع إدارة المدرسة لتأكيد المدفوعات وتحديث السجلات.'
+                      : 'Please contact the school administration to confirm payments and update the records.' }}
+                  </div>
+
+                </div>
+
+                <button
+                  type="button"
+                  class="btn btn-primary full-width"
+                  (click)="closePaymentDetails()"
+                >
+                  {{ prefs.lang() === 'ar' ? 'إغلاق' : 'Close' }}
+                </button>
+
+              </div>
+            </div>
+          }
+
+        }
+
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <span class="footer-title">{{ t().officeName }}</span>
+        <p class="footer-desc">{{ t().officeDesc }}</p>
+      </div>
+
+      <div class="footer-bottom">
+        <p>{{ t().footerCopyright }}</p>
+      </div>
+    </div>
+  </footer>
+</div>
