@@ -115,6 +115,77 @@ export interface AppTranslations {
   readonly loginGenericError: string;
   readonly loginInvalidCredentialsError: string;
   readonly serverConnectionError: string;
+
+  readonly navStudents: string;
+  readonly navSubscription: string;
+
+  readonly studentRegTitle: string;
+  readonly studentRegSubtitle: string;
+  readonly registeredStudentsHeader: string;
+  readonly noStudentsNotice: string;
+  readonly studentNameLabel: string;
+  readonly studentNamePlaceholder: string;
+  readonly studentNameError: string;
+  readonly studentGradeLabel: string;
+  readonly studentGradePlaceholder: string;
+  readonly studentGradeError: string;
+  readonly studentClassLabel: string;
+  readonly studentClassPlaceholder: string;
+  readonly studentClassError: string;
+  readonly studentDobLabel: string;
+  readonly studentNotesLabel: string;
+  readonly studentNotesPlaceholder: string;
+  readonly addStudentBtn: string;
+  readonly updateStudentBtn: string;
+  readonly cancelEditBtn: string;
+  readonly deleteStudentBtn: string;
+  readonly editStudentBtn: string;
+  readonly studentSavedSuccess: string;
+  readonly studentUpdatedSuccess: string;
+  readonly studentDeletedSuccess: string;
+  readonly proceedToSubBtn: string;
+
+  readonly subPageTitle: string;
+  readonly subPageSubtitle: string;
+  readonly selectStudentStep: string;
+  readonly selectStudentPlaceholder: string;
+  readonly noRegisteredStudentsWarning: string;
+  readonly registerStudentFirstBtn: string;
+  readonly selectRouteStep: string;
+  readonly selectRoutePlaceholder: string;
+  readonly routeCapacityLabel: string;
+  readonly routeFullWarning: string;
+  readonly selectStopStep: string;
+  readonly selectStopPlaceholder: string;
+  readonly selectTypeStep: string;
+  readonly typeRoundTrip: string;
+  readonly typeRoundTripDesc: string;
+  readonly typeOneWay: string;
+  readonly typeOneWayDesc: string;
+  readonly subFeeSummary: string;
+  readonly monthlyFeeLabel: string;
+  readonly currencyJOD: string;
+  readonly subConditionsNotice: string;
+  readonly submitSubscriptionBtn: string;
+  readonly submittingSubscriptionBtn: string;
+
+  readonly confirmationTitle: string;
+  readonly confirmationSubtitle: string;
+  readonly refNumberLabel: string;
+  readonly statusLabel: string;
+  readonly statusPending: string;
+  readonly studentDetailsHeader: string;
+  readonly routeDetailsHeader: string;
+  readonly feeDetailsHeader: string;
+  readonly selectedStopLabel: string;
+  readonly pickupTimeLabel: string;
+  readonly dropoffTimeLabel: string;
+  readonly transportTypeLabel: string;
+  readonly requestedAtLabel: string;
+  readonly officeReviewNotice: string;
+  readonly printConfirmationBtn: string;
+  readonly backToHomeBtn: string;
+  readonly registerAnotherStudentBtn: string;
 }
 
 const EN_TRANSLATIONS: AppTranslations = {
@@ -271,6 +342,77 @@ const EN_TRANSLATIONS: AppTranslations = {
   loginGenericError: 'Please provide valid credentials.',
   loginInvalidCredentialsError: 'Invalid email address or password.',
   serverConnectionError: 'Unable to connect to the server. Please ensure the backend service is running.',
+
+  navStudents: 'Students',
+  navSubscription: 'Subscription',
+
+  studentRegTitle: 'Student Registration',
+  studentRegSubtitle: 'Register and manage students under your guardian account to request transportation.',
+  registeredStudentsHeader: 'Registered Students',
+  noStudentsNotice: 'No students registered yet. Add your first student below.',
+  studentNameLabel: 'Student Full Name *',
+  studentNamePlaceholder: 'Enter student full name',
+  studentNameError: 'Student full name is required (minimum 3 characters).',
+  studentGradeLabel: 'School Grade *',
+  studentGradePlaceholder: 'Select school grade',
+  studentGradeError: 'Please select a school grade.',
+  studentClassLabel: 'Class or Section *',
+  studentClassPlaceholder: 'e.g. 5A or 4B',
+  studentClassError: 'Class or section is required.',
+  studentDobLabel: 'Date of Birth',
+  studentNotesLabel: 'Special Notes (Medical or Pickup Instructions)',
+  studentNotesPlaceholder: 'Any medical conditions, allergies, or specific pickup instructions',
+  addStudentBtn: 'Register Student',
+  updateStudentBtn: 'Update Student',
+  cancelEditBtn: 'Cancel',
+  deleteStudentBtn: 'Delete',
+  editStudentBtn: 'Edit',
+  studentSavedSuccess: 'Student registered successfully!',
+  studentUpdatedSuccess: 'Student updated successfully!',
+  studentDeletedSuccess: 'Student removed successfully.',
+  proceedToSubBtn: 'Request Transportation for this Student',
+
+  subPageTitle: 'Transportation Subscription',
+  subPageSubtitle: 'Select a student, bus route, and pickup stop to submit a subscription request.',
+  selectStudentStep: '1. Select Registered Student',
+  selectStudentPlaceholder: 'Choose a student',
+  noRegisteredStudentsWarning: 'You have no registered students yet. Please register a student first.',
+  registerStudentFirstBtn: 'Go to Student Registration',
+  selectRouteStep: '2. Select Bus Route',
+  selectRoutePlaceholder: 'Choose a route',
+  routeCapacityLabel: 'Remaining Seats',
+  routeFullWarning: 'This route is currently full. Please choose another route or contact the transport office.',
+  selectStopStep: '3. Select Pickup Stop',
+  selectStopPlaceholder: 'Choose a pickup stop',
+  selectTypeStep: '4. Transportation Service Type',
+  typeRoundTrip: 'Round Trip',
+  typeRoundTripDesc: 'Morning pickup and afternoon return home',
+  typeOneWay: 'One Way',
+  typeOneWayDesc: 'Morning pickup or afternoon drop off only',
+  subFeeSummary: 'Subscription Fee Summary',
+  monthlyFeeLabel: 'Monthly Fee',
+  currencyJOD: 'JOD per month',
+  subConditionsNotice: 'Subscription is valid for the current school term. Requests are reviewed by the school transport office.',
+  submitSubscriptionBtn: 'Submit Subscription Request',
+  submittingSubscriptionBtn: 'Submitting Request...',
+
+  confirmationTitle: 'Subscription Confirmation',
+  confirmationSubtitle: 'Your transportation request has been received and is pending administrative approval.',
+  refNumberLabel: 'Reference Number',
+  statusLabel: 'Request Status',
+  statusPending: 'Pending Approval',
+  studentDetailsHeader: 'Student Details',
+  routeDetailsHeader: 'Route and Schedule',
+  feeDetailsHeader: 'Fee and Billing',
+  selectedStopLabel: 'Pickup Stop',
+  pickupTimeLabel: 'Morning Pickup Time',
+  dropoffTimeLabel: 'Afternoon Drop off Time',
+  transportTypeLabel: 'Transport Type',
+  requestedAtLabel: 'Submission Date',
+  officeReviewNotice: 'Our transportation coordinators will review seat assignments and approve the subscription within 24 hours. Payment is settled at the school administration office.',
+  printConfirmationBtn: 'Print Confirmation',
+  backToHomeBtn: 'Back to Home',
+  registerAnotherStudentBtn: 'Register Another Student',
 };
 
 const AR_TRANSLATIONS: AppTranslations = {
@@ -427,6 +569,77 @@ const AR_TRANSLATIONS: AppTranslations = {
   loginGenericError: 'يرجى إدخال بيانات دخول صحيحة.',
   loginInvalidCredentialsError: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
   serverConnectionError: 'تعذر الاتصال بالخادم. يرجى التأكد من تشغيل خادم النظام.',
+
+  navStudents: 'الطلاب',
+  navSubscription: 'الاشتراك',
+
+  studentRegTitle: 'تسجيل الطلاب',
+  studentRegSubtitle: 'سجل وأدر بيانات أبنائك ضمن حسابك لطلب خدمات النقل المدرسي.',
+  registeredStudentsHeader: 'الطلاب المسجلون',
+  noStudentsNotice: 'لم يتم تسجيل أي طالب حتى الآن. يرجى إضافة بيانات الطالب أدناه.',
+  studentNameLabel: 'الاسم الكامل للطالب *',
+  studentNamePlaceholder: 'أدخل الاسم الكامل للطالب',
+  studentNameError: 'اسم الطالب مطلوب (3 أحرف كحد أدنى).',
+  studentGradeLabel: 'المرحلة الدراسية *',
+  studentGradePlaceholder: 'اختر المرحلة الدراسية',
+  studentGradeError: 'يرجى تحديد المرحلة الدراسية.',
+  studentClassLabel: 'الصف أو الشعبة *',
+  studentClassPlaceholder: 'مثال: 5أ أو 4ب',
+  studentClassError: 'الصف أو الشعبة مطلوب.',
+  studentDobLabel: 'تاريخ الميلاد',
+  studentNotesLabel: 'ملاحظات خاصة (طبية أو إرشادات نقل)',
+  studentNotesPlaceholder: 'أي حالات صحية أو تنبيهات لمشرفي الحافلة',
+  addStudentBtn: 'تسجيل الطالب',
+  updateStudentBtn: 'تحديث البيانات',
+  cancelEditBtn: 'إلغاء',
+  deleteStudentBtn: 'حذف',
+  editStudentBtn: 'تعديل',
+  studentSavedSuccess: 'تم تسجيل الطالب بنجاح!',
+  studentUpdatedSuccess: 'تم تحديث بيانات الطالب بنجاح!',
+  studentDeletedSuccess: 'تم حذف الطالب بنجاح.',
+  proceedToSubBtn: 'طلب اشتراك في النقل لهذا الطالب',
+
+  subPageTitle: 'طلب الاشتراك في النقل',
+  subPageSubtitle: 'اختر الطالب ومسار الحافلة ومحطة الاصطحاب لتقديم طلب اشتراك جديد.',
+  selectStudentStep: '1. اختيار الطالب المسجل',
+  selectStudentPlaceholder: 'اختر طالباً',
+  noRegisteredStudentsWarning: 'لا يوجد طلاب مسجلون في حسابك. يرجى تسجيل طالب أولاً.',
+  registerStudentFirstBtn: 'الانتقال إلى تسجيل الطلاب',
+  selectRouteStep: '2. اختيار مسار الحافلة',
+  selectRoutePlaceholder: 'اختر المسار',
+  routeCapacityLabel: 'المقاعد المتبقية',
+  routeFullWarning: 'هذا المسار مكتمل السعة حالياً. يرجى اختيار مسار آخر أو مراجعة مكتب النقل.',
+  selectStopStep: '3. اختيار محطة الاصطحاب',
+  selectStopPlaceholder: 'اختر محطة الاصطحاب',
+  selectTypeStep: '4. نوع خدمة النقل',
+  typeRoundTrip: 'ذهاب وإياب',
+  typeRoundTripDesc: 'اصطحاب صباحي من المحطة وعودة منزلية بعد الظهر',
+  typeOneWay: 'اتجاه واحد',
+  typeOneWayDesc: 'اصطحاب صباحي فقط أو توصيل بعد الظهر فقط',
+  subFeeSummary: 'ملخص رسوم الاشتراك',
+  monthlyFeeLabel: 'الرسوم الشهرية',
+  currencyJOD: 'دينار أردني شهرياً',
+  subConditionsNotice: 'الاشتراك معتمد للفصل الدراسي الحالي. تخضع جميع الطلبات لمراجعة واعتماد مكتب النقل.',
+  submitSubscriptionBtn: 'إرسال طلب الاشتراك',
+  submittingSubscriptionBtn: 'جاري إرسال الطلب...',
+
+  confirmationTitle: 'تأكيد طلب الاشتراك',
+  confirmationSubtitle: 'تم استلام طلب الاشتراك في النقل المدرسي بنجاح وهو الآن بانتظار الاعتماد الإداري.',
+  refNumberLabel: 'رقم المرجع',
+  statusLabel: 'حالة الطلب',
+  statusPending: 'قيد المراجعة',
+  studentDetailsHeader: 'بيانات الطالب',
+  routeDetailsHeader: 'المسار والجدول الزمني',
+  feeDetailsHeader: 'الرسوم والدفع',
+  selectedStopLabel: 'محطة الاصطحاب',
+  pickupTimeLabel: 'موعد الاصطحاب الصباحي',
+  dropoffTimeLabel: 'موعد العودة بعد الظهر',
+  transportTypeLabel: 'نوع الخدمة',
+  requestedAtLabel: 'تاريخ التقديم',
+  officeReviewNotice: 'سيقوم منسقو النقل بمراجعة تخصيص المقاعد واعتماد الاشتراك خلال 24 ساعة. يتم سداد الرسوم لدى الإدارة المدرسية.',
+  printConfirmationBtn: 'طباعة التأكيد',
+  backToHomeBtn: 'العودة للرئيسية',
+  registerAnotherStudentBtn: 'تسجيل طالب آخر',
 };
 
 const STORAGE_LANG = 'stms_lang';

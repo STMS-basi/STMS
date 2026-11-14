@@ -1,0 +1,141 @@
+<div class="page-container">
+  <app-header />
+
+  <main class="confirmation-main">
+    <section class="section" aria-labelledby="confirmation-heading">
+      <div class="section-container">
+        <!-- Success Banner -->
+        <div class="confirmation-header">
+          <div class="success-icon-badge" aria-hidden="true">&#10003;</div>
+          <span class="section-badge">{{ t().confirmationTitle }}</span>
+          <h1 id="confirmation-heading" class="section-title">{{ t().confirmationTitle }}</h1>
+          <p class="section-subtitle">{{ t().confirmationSubtitle }}</p>
+        </div>
+
+        @if (subscription(); as sub) {
+          <div class="confirmation-card card">
+            <!-- Top Reference Bar -->
+            <div class="reference-banner">
+              <div class="ref-col">
+                <span class="ref-label">{{ t().refNumberLabel }}</span>
+                <strong class="ref-value">{{ sub.referenceNumber }}</strong>
+              </div>
+
+              <div class="ref-status">
+                <span class="ref-label">{{ t().statusLabel }}</span>
+                <span class="status-pill status-pending">{{ t().statusPending }}</span>
+              </div>
+            </div>
+
+            <!-- Details Grid -->
+            <div class="details-grid">
+              <!-- Student Info -->
+              <div class="details-block">
+                <h2 class="block-title">{{ t().studentDetailsHeader }}</h2>
+                <div class="detail-row">
+                  <span class="detail-name">{{ t().studentNameLabel }}</span>
+                  <strong class="detail-val">{{ sub.studentName }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-name">{{ t().studentGradeLabel }}</span>
+                  <span class="detail-val">{{ sub.studentGrade }}</span>
+                </div>
+              </div>
+
+              <!-- Route and Schedule Info -->
+              <div class="details-block">
+                <h2 class="block-title">{{ t().routeDetailsHeader }}</h2>
+                <div class="detail-row">
+                  <span class="detail-name">{{ t().selectRouteStep }}</span>
+                  <strong class="detail-val">{{ sub.routeNumber }} &bull; {{ sub.routeName }}</strong>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-name">{{ t().selectedStopLabel }}</span>
+                  <span class="detail-val">{{ sub.stopName }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-name">{{ t().pickupTimeLabel }}</span>
+                  <span class="detail-val">{{ sub.pickupTime }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-name">{{ t().dropoffTimeLabel }}</span>
+                  <span class="detail-val">{{ sub.dropoffTime }}</span>
+                </div>
+              </div>
+
+              <!-- Billing and Submission Info -->
+              <div class="details-block">
+                <h2 class="block-title">{{ t().feeDetailsHeader }}</h2>
+                <div class="detail-row">
+                  <span class="detail-name">{{ t().transportTypeLabel }}</span>
+                  <strong class="detail-val">
+                    {{ sub.transportType === 'RoundTrip' ? t().typeRoundTrip : t().typeOneWay }}
+                  </strong>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-name">{{ t().monthlyFeeLabel }}</span>
+                  <strong class="detail-val fee-highlight">{{ sub.fee }} JOD</strong>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-name">{{ t().requestedAtLabel }}</span>
+                  <span class="detail-val">{{ sub.requestedAt | date: 'mediumDate' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Important Notice Box -->
+            <div class="office-notice-box">
+              <span class="notice-icon" aria-hidden="true">&#9432;</span>
+              <p class="notice-text">{{ t().officeReviewNotice }}</p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="confirmation-actions">
+              <button
+                type="button"
+                class="btn btn-outline"
+                (click)="printReceipt()"
+              >
+                {{ t().printConfirmationBtn }}
+              </button>
+
+              <a routerLink="/students" class="btn btn-secondary">
+                {{ t().registerAnotherStudentBtn }}
+              </a>
+
+              <a routerLink="/" class="btn btn-primary">
+                {{ t().backToHomeBtn }}
+              </a>
+            </div>
+          </div>
+        } @else {
+          <div class="card empty-card">
+            <h2 class="card-title">{{ t().confirmationTitle }}</h2>
+            <p class="empty-desc">{{ t().noStudentsNotice }}</p>
+            <div class="empty-actions">
+              <a routerLink="/subscription" class="btn btn-primary">
+                {{ t().navSubscription }}
+              </a>
+              <a routerLink="/" class="btn btn-outline">
+                {{ t().backToHomeBtn }}
+              </a>
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <span class="footer-title">{{ t().officeName }}</span>
+        <p class="footer-desc">{{ t().officeDesc }}</p>
+      </div>
+      <div class="footer-bottom">
+        <p>{{ t().footerCopyright }}</p>
+      </div>
+    </div>
+  </footer>
+</div>
+
