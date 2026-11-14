@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { NgOptimizedImage } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Header } from '../header/header';
 import { PreferencesService } from '../services/preferences.service';
@@ -28,7 +29,7 @@ interface SchoolRoute {
 
 @Component({
   selector: 'app-routes',
-  imports: [RouterLink, Header],
+  imports: [NgOptimizedImage, RouterLink, Header],
   templateUrl: './routes.html',
   styleUrl: './routes.css',
 })

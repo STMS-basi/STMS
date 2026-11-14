@@ -14,10 +14,9 @@
     @if (variant() === 'full') {
       <!-- Desktop Navigation Menu -->
       <nav class="nav-menu" aria-label="Main Navigation">
-        <a routerLink="/transport" class="nav-link">{{ t().navServices }}</a>
-        <a routerLink="/routes" class="nav-link">{{ t().navRoutesSafety }}</a>
-        <a routerLink="/students" class="nav-link">{{ t().navStudents }}</a>
-        <a routerLink="/subscription" class="nav-link">{{ t().navSubscription }}</a>
+        <a href="#services" class="nav-link">{{ t().navServices }}</a>
+        <a href="#information" class="nav-link">{{ t().navRoutesSafety }}</a>
+        <a href="#office" class="nav-link">{{ t().navOfficeContact }}</a>
       </nav>
 
       <!-- Auth Actions & Preference Controls -->
@@ -91,10 +90,9 @@
   <!-- Mobile Navigation Drawer -->
   @if (variant() === 'full' && isMenuOpen()) {
     <nav class="mobile-nav" aria-label="Mobile Navigation">
-      <a routerLink="/transport" class="mobile-link" (click)="closeMenu()">{{ t().navServices }}</a>
-      <a routerLink="/routes" class="mobile-link" (click)="closeMenu()">{{ t().navRoutesSafety }}</a>
-      <a routerLink="/students" class="mobile-link" (click)="closeMenu()">{{ t().navStudents }}</a>
-      <a routerLink="/subscription" class="mobile-link" (click)="closeMenu()">{{ t().navSubscription }}</a>
+      <a href="#services" class="mobile-link" (click)="closeMenu()">{{ t().navServices }}</a>
+      <a href="#information" class="mobile-link" (click)="closeMenu()">{{ t().navRoutesSafety }}</a>
+      <a href="#office" class="mobile-link" (click)="closeMenu()">{{ t().navOfficeContact }}</a>
 
       <div class="header-controls mobile-controls">
         <button
