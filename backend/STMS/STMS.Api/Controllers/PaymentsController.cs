@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using STMS.Core.Entities;
 using STMS.Infrastructure.Data;
 using System.Security.Claims;
@@ -117,50 +118,6 @@ namespace STMS.Api.Controllers
           message = "Valid subscription ID and positive amount are required."
         });
 
-      var subscription = await _context.Subscriptions
-          .AsNoTracking()
-          .FirstOrDefaultAsync(s =>
-              s.SubscriptionId == request.SubscriptionId);
-
-      if (subscription == null)
-        return NotFound(new
-        {
-          message = "Subscription not found."
-        });
-
-      if (subscription.Status != "Approved")
-        return Conflict(new
-        {
-          message = "Only approved subscriptions can receive payments."
-        });
-
-      var payment = await _context.Payments
-          .FirstOrDefaultAsync(p =>
-              p.SubscriptionId == request.SubscriptionId);
-
-      if (payment == null)
-      {
-        payment = new Payment
-        {
-          SubscriptionId = subscription.SubscriptionId,
-          AmountDue = subscription.Fee,
-          AmountPaid = 0m,
-          Status = "Unpaid"
-        };
-
-        _context.Payments.Add(payment);
-      }
-
-      decimal remainingAmount =
-          payment.AmountDue - payment.AmountPaid;
-
-      if (request.Amount > remainingAmount)
-        return BadRequest(new
-        {
-          message = "Payment amount exceeds the remaining balance.",
-          remainingAmount
-        });
-
       var userIdValue = User.FindFirstValue(
           ClaimTypes.NameIdentifier);
 
@@ -170,30 +127,117 @@ namespace STMS.Api.Controllers
           message = "Invalid admin token."
         });
 
-      payment.AmountPaid += request.Amount;
+      await using var transaction =
+          await _context.Database.BeginTransactionAsync();
 
-      payment.Status =
-          payment.AmountPaid >= payment.AmountDue
-              ? "Paid"
-              : "Partial";
-
-      payment.PaymentDate = DateTime.Now;
-      payment.RecordedBy = adminUserId;
-      payment.Notes = request.Notes;
-
-      await _context.SaveChangesAsync();
-
-      return Ok(new
+      try
       {
-        message = "Payment recorded successfully.",
-        paymentId = payment.PaymentId,
-        subscriptionId = payment.SubscriptionId,
-        amountDue = payment.AmountDue,
-        amountPaid = payment.AmountPaid,
-        remainingAmount =
-              payment.AmountDue - payment.AmountPaid,
-        status = payment.Status
-      });
+        // Lock the subscription row before reading payment data.
+        // This serializes payment requests for the same subscription.
+        var connection = _context.Database.GetDbConnection();
+        var dbTransaction = transaction.GetDbTransaction();
+
+        await using (var command = connection.CreateCommand())
+        {
+          command.Transaction = dbTransaction;
+
+          command.CommandText =
+              "SELECT SUBSCRIPTIONID FROM SUBSCRIPTIONS " +
+              "WHERE SUBSCRIPTIONID = :id FOR UPDATE";
+
+          command.CommandTimeout = 30;
+
+          var parameter = command.CreateParameter();
+          parameter.ParameterName = "id";
+          parameter.Value = request.SubscriptionId;
+
+          command.Parameters.Add(parameter);
+
+          await using var reader =
+              await command.ExecuteReaderAsync();
+
+          if (!await reader.ReadAsync())
+            return NotFound(new
+            {
+              message = "Subscription not found."
+            });
+        }
+
+        // Read subscription after acquiring the row lock.
+        var subscription = await _context.Subscriptions
+            .AsNoTracking()
+            .FirstAsync(s =>
+                s.SubscriptionId == request.SubscriptionId);
+
+        if (subscription.Status != "Approved")
+          return Conflict(new
+          {
+            message = "Only approved subscriptions can receive payments."
+          });
+
+        // Read payment after acquiring the subscription lock.
+        var payment = await _context.Payments
+            .FirstOrDefaultAsync(p =>
+                p.SubscriptionId == request.SubscriptionId);
+
+        // One payment summary record per subscription.
+        if (payment == null)
+        {
+          payment = new Payment
+          {
+            SubscriptionId = subscription.SubscriptionId,
+            AmountDue = subscription.Fee,
+            AmountPaid = 0m,
+            Status = "Unpaid"
+          };
+
+          _context.Payments.Add(payment);
+        }
+
+        decimal remainingAmount =
+            payment.AmountDue - payment.AmountPaid;
+
+        if (request.Amount > remainingAmount)
+          return BadRequest(new
+          {
+            message = "Payment amount exceeds the remaining balance.",
+            remainingAmount
+          });
+
+        // Update payment amount safely inside the transaction.
+        payment.AmountPaid += request.Amount;
+
+        payment.Status =
+            payment.AmountPaid >= payment.AmountDue
+                ? "Paid"
+                : "Partial";
+
+        payment.PaymentDate = DateTime.UtcNow;
+        payment.RecordedBy = adminUserId;
+        payment.Notes = request.Notes;
+
+        await _context.SaveChangesAsync();
+
+        // Release the lock after successfully saving.
+        await transaction.CommitAsync();
+
+        return Ok(new
+        {
+          message = "Payment recorded successfully.",
+          paymentId = payment.PaymentId,
+          subscriptionId = payment.SubscriptionId,
+          amountDue = payment.AmountDue,
+          amountPaid = payment.AmountPaid,
+          remainingAmount =
+                payment.AmountDue - payment.AmountPaid,
+          status = payment.Status
+        });
+      }
+      catch
+      {
+        await transaction.RollbackAsync();
+        throw;
+      }
     }
 
     // ============================================
@@ -210,7 +254,8 @@ namespace STMS.Api.Controllers
 
       var parent = await _context.Parents
           .AsNoTracking()
-          .FirstOrDefaultAsync(p => p.UserId == userId);
+          .FirstOrDefaultAsync(p =>
+              p.UserId == userId);
 
       return parent?.ParentId;
     }
