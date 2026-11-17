@@ -1,11 +1,11 @@
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-
 
 namespace STMS.Api.DTOs.Students
 {
-  public class CreateStudentRequest
+  public class CreateStudentRequest : IValidatableObject
   {
     [Required(ErrorMessage = "Student name is required.")]
     [MaxLength(150)]
@@ -23,5 +23,17 @@ namespace STMS.Api.DTOs.Students
 
     [MaxLength(500)]
     public string? Notes { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(
+        ValidationContext validationContext)
+    {
+      if (DateOfBirth.HasValue &&
+          DateOfBirth.Value.Date > DateTime.Today)
+      {
+        yield return new ValidationResult(
+            "Date of birth cannot be in the future.",
+            new[] { nameof(DateOfBirth) });
+      }
+    }
   }
 }

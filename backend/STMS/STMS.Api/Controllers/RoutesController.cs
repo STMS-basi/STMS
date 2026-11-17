@@ -2,8 +2,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using STMS.Api.DTOs.Routes;
 using STMS.Infrastructure.Data;
+using System.Data.Common;
 
 namespace STMS.Api.Controllers
 {
@@ -135,7 +137,7 @@ namespace STMS.Api.Controllers
     }
 
     // GET /api/routes/admin
-    // Admin: Get all routes (active and inactive)
+    // Admin: Get all routes
     [HttpGet("admin")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAllRoutesForAdmin()
@@ -163,7 +165,7 @@ namespace STMS.Api.Controllers
     }
 
     // POST /api/routes/admin
-    // Admin: Create a new route
+    // Admin: Create route
     [HttpPost("admin")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CreateRoute(
@@ -202,7 +204,6 @@ namespace STMS.Api.Controllers
         });
       }
 
-      // Validate assigned bus and its capacity
       if (request.BusId.HasValue)
       {
         var assignedBus = await _context.Buses
@@ -268,24 +269,13 @@ namespace STMS.Api.Controllers
     }
 
     // PUT /api/routes/admin/{id}
-    // Admin: Update route details
+    // Admin: Update route
     [HttpPut("admin/{id:int}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateRoute(
         int id,
         [FromBody] UpdateRouteRequest request)
     {
-      var route = await _context.Routes
-          .FirstOrDefaultAsync(r => r.RouteId == id);
-
-      if (route == null)
-      {
-        return NotFound(new
-        {
-          message = "Route not found."
-        });
-      }
-
       if (string.IsNullOrWhiteSpace(request.RouteNumber) ||
           string.IsNullOrWhiteSpace(request.Name) ||
           string.IsNullOrWhiteSpace(request.StartPoint) ||
@@ -306,6 +296,31 @@ namespace STMS.Api.Controllers
         });
       }
 
+      await using var transaction =
+          await _context.Database.BeginTransactionAsync();
+
+      // Lock the route before checking reservations.
+      var routeExists = await LockRouteAsync(id);
+
+      if (!routeExists)
+      {
+        return NotFound(new
+        {
+          message = "Route not found."
+        });
+      }
+
+      var route = await _context.Routes
+          .FirstOrDefaultAsync(r => r.RouteId == id);
+
+      if (route == null)
+      {
+        return NotFound(new
+        {
+          message = "Route not found."
+        });
+      }
+
       var routeNumber = request.RouteNumber.Trim();
 
       var duplicateExists = await _context.Routes
@@ -321,7 +336,6 @@ namespace STMS.Api.Controllers
         });
       }
 
-      // Validate assigned bus and its capacity
       if (request.BusId.HasValue)
       {
         var assignedBus = await _context.Buses
@@ -362,6 +376,20 @@ namespace STMS.Api.Controllers
         }
       }
 
+      // Protect current and future semester reservations.
+      var maxReservedSeats =
+          await GetMaximumProtectedReservationsAsync(id);
+
+      if (request.Capacity < maxReservedSeats)
+      {
+        return Conflict(new
+        {
+          message =
+                "Route capacity cannot be smaller than existing reservations for an active or future semester.",
+          minimumCapacity = maxReservedSeats
+        });
+      }
+
       route.RouteNumber = routeNumber;
       route.Name = request.Name.Trim();
       route.StartPoint = request.StartPoint.Trim();
@@ -372,6 +400,7 @@ namespace STMS.Api.Controllers
       route.DriverId = request.DriverId;
 
       await _context.SaveChangesAsync();
+      await transaction.CommitAsync();
 
       return Ok(new
       {
@@ -382,11 +411,23 @@ namespace STMS.Api.Controllers
     }
 
     // PATCH /api/routes/admin/{id}/deactivate
-    // Admin: Deactivate a route
     [HttpPatch("admin/{id:int}/deactivate")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeactivateRoute(int id)
     {
+      await using var transaction =
+          await _context.Database.BeginTransactionAsync();
+
+      var routeExists = await LockRouteAsync(id);
+
+      if (!routeExists)
+      {
+        return NotFound(new
+        {
+          message = "Route not found."
+        });
+      }
+
       var route = await _context.Routes
           .FirstOrDefaultAsync(r => r.RouteId == id);
 
@@ -406,6 +447,8 @@ namespace STMS.Api.Controllers
         });
       }
 
+      // Keep the existing business rule:
+      // Any pending or approved subscription blocks deactivation.
       var hasActiveSubscriptions = await _context.Subscriptions
           .AnyAsync(s =>
               s.RouteId == id &&
@@ -423,6 +466,7 @@ namespace STMS.Api.Controllers
       route.IsActive = false;
 
       await _context.SaveChangesAsync();
+      await transaction.CommitAsync();
 
       return Ok(new
       {
@@ -433,11 +477,23 @@ namespace STMS.Api.Controllers
     }
 
     // PATCH /api/routes/admin/{id}/activate
-    // Admin: Reactivate an inactive route
     [HttpPatch("admin/{id:int}/activate")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ActivateRoute(int id)
     {
+      await using var transaction =
+          await _context.Database.BeginTransactionAsync();
+
+      var routeExists = await LockRouteAsync(id);
+
+      if (!routeExists)
+      {
+        return NotFound(new
+        {
+          message = "Route not found."
+        });
+      }
+
       var route = await _context.Routes
           .FirstOrDefaultAsync(r => r.RouteId == id);
 
@@ -457,7 +513,6 @@ namespace STMS.Api.Controllers
         });
       }
 
-      // Validate assigned bus and its capacity
       if (route.BusId.HasValue)
       {
         var assignedBus = await _context.Buses
@@ -469,7 +524,8 @@ namespace STMS.Api.Controllers
         {
           return BadRequest(new
           {
-            message = "Cannot activate route because its assigned bus is inactive or missing."
+            message =
+                  "Cannot activate route because its assigned bus is inactive or missing."
           });
         }
 
@@ -477,7 +533,8 @@ namespace STMS.Api.Controllers
         {
           return BadRequest(new
           {
-            message = "Cannot activate route because its assigned bus capacity is insufficient."
+            message =
+                  "Cannot activate route because its assigned bus capacity is insufficient."
           });
         }
       }
@@ -493,14 +550,29 @@ namespace STMS.Api.Controllers
         {
           return BadRequest(new
           {
-            message = "Cannot activate route because its assigned driver is inactive or missing."
+            message =
+                  "Cannot activate route because its assigned driver is inactive or missing."
           });
         }
+      }
+
+      var maxReservedSeats =
+          await GetMaximumProtectedReservationsAsync(id);
+
+      if (route.Capacity < maxReservedSeats)
+      {
+        return Conflict(new
+        {
+          message =
+                "Cannot activate route because its capacity is smaller than existing reservations.",
+          minimumCapacity = maxReservedSeats
+        });
       }
 
       route.IsActive = true;
 
       await _context.SaveChangesAsync();
+      await transaction.CommitAsync();
 
       return Ok(new
       {
@@ -508,6 +580,76 @@ namespace STMS.Api.Controllers
         routeId = route.RouteId,
         isActive = route.IsActive
       });
+    }
+
+    // ============================================
+    // HELPERS
+    // ============================================
+
+    // Count reservations separately for each semester.
+    // Ignore semesters that have already ended.
+    // Return the largest protected reservation count.
+    private async Task<int> GetMaximumProtectedReservationsAsync(
+        int routeId)
+    {
+      var today = DateTime.Today;
+
+      var reservationsBySemester =
+          await _context.Subscriptions
+              .AsNoTracking()
+              .Where(s =>
+                  s.RouteId == routeId &&
+                  s.EndDate >= today &&
+                  (s.Status == "Pending" ||
+                   s.Status == "Approved"))
+              .GroupBy(s => new
+              {
+                s.StartDate,
+                s.EndDate
+              })
+              .Select(g => g.Count())
+              .ToListAsync();
+
+      return reservationsBySemester.Count == 0
+          ? 0
+          : reservationsBySemester.Max();
+    }
+
+    // Lock the route row in Oracle.
+    // This uses the same route lock as subscription creation.
+    // An EF Core transaction must already be active.
+    private async Task<bool> LockRouteAsync(int routeId)
+    {
+      var currentTransaction =
+          _context.Database.CurrentTransaction
+          ?? throw new InvalidOperationException(
+              "An active transaction is required.");
+
+      var connection = _context.Database.GetDbConnection();
+
+      var dbTransaction =
+          currentTransaction.GetDbTransaction();
+
+      await using var command = connection.CreateCommand();
+
+      command.Transaction = dbTransaction;
+
+      command.CommandText =
+          "SELECT ROUTEID FROM ROUTES " +
+          "WHERE ROUTEID = :id FOR UPDATE";
+
+      command.CommandTimeout = 30;
+
+      var parameter = command.CreateParameter();
+      parameter.ParameterName = "id";
+      parameter.Value = routeId;
+
+      command.Parameters.Add(parameter);
+
+      await using var reader =
+          await command.ExecuteReaderAsync();
+
+      return await reader.ReadAsync();
     }
   }
 }
