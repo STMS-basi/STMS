@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using STMS.Api.DTOs.Buses;
 using STMS.Infrastructure.Data;
 
@@ -98,7 +99,8 @@ namespace STMS.Api.Controllers
       {
         return Conflict(new
         {
-          message = "A bus with this plate number already exists."
+          message =
+                "A bus with this plate number already exists."
         });
       }
 
@@ -123,24 +125,13 @@ namespace STMS.Api.Controllers
     }
 
     // PUT /api/buses/admin/{id}
-    // Admin: Update bus details
+    // Admin: Update bus details safely.
     [HttpPut("admin/{id:int}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateBus(
         int id,
         [FromBody] UpdateBusRequest request)
     {
-      var bus = await _context.Buses
-          .FirstOrDefaultAsync(b => b.BusId == id);
-
-      if (bus == null)
-      {
-        return NotFound(new
-        {
-          message = "Bus not found."
-        });
-      }
-
       if (string.IsNullOrWhiteSpace(request.PlateNumber))
       {
         return BadRequest(new
@@ -157,6 +148,32 @@ namespace STMS.Api.Controllers
         });
       }
 
+      await using var transaction =
+          await _context.Database.BeginTransactionAsync();
+
+      // Lock the bus before reading assigned routes.
+      // Route operations also lock the bus first.
+      var busExists = await LockBusAsync(id);
+
+      if (!busExists)
+      {
+        return NotFound(new
+        {
+          message = "Bus not found."
+        });
+      }
+
+      var bus = await _context.Buses
+          .FirstOrDefaultAsync(b => b.BusId == id);
+
+      if (bus == null)
+      {
+        return NotFound(new
+        {
+          message = "Bus not found."
+        });
+      }
+
       var plateNumber = request.PlateNumber.Trim();
 
       var duplicatePlate = await _context.Buses
@@ -168,11 +185,14 @@ namespace STMS.Api.Controllers
       {
         return Conflict(new
         {
-          message = "A bus with this plate number already exists."
+          message =
+                "A bus with this plate number already exists."
         });
       }
 
-      // Check capacities of active routes using this bus
+      // Read assigned routes after locking the bus.
+      // This prevents concurrent route assignment or
+      // activation from bypassing the capacity check.
       var assignedRoutes = await _context.Routes
           .AsNoTracking()
           .Where(r => r.BusId == id)
@@ -185,13 +205,15 @@ namespace STMS.Api.Controllers
           .ToListAsync();
 
       var capacityConflict = assignedRoutes.Any(r =>
-          r.IsActive && r.Capacity > request.Capacity);
+          r.IsActive &&
+          r.Capacity > request.Capacity);
 
       if (capacityConflict)
       {
         return Conflict(new
         {
-          message = "Bus capacity cannot be smaller than the capacity of an assigned active route."
+          message =
+                "Bus capacity cannot be smaller than the capacity of an assigned active route."
         });
       }
 
@@ -199,6 +221,7 @@ namespace STMS.Api.Controllers
       bus.Capacity = request.Capacity;
 
       await _context.SaveChangesAsync();
+      await transaction.CommitAsync();
 
       return Ok(new
       {
@@ -210,11 +233,25 @@ namespace STMS.Api.Controllers
     }
 
     // PATCH /api/buses/admin/{id}/deactivate
-    // Admin: Deactivate a bus
+    // Admin: Deactivate a bus only if it has
+    // no assigned active routes.
     [HttpPatch("admin/{id:int}/deactivate")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeactivateBus(int id)
     {
+      await using var transaction =
+          await _context.Database.BeginTransactionAsync();
+
+      var busExists = await LockBusAsync(id);
+
+      if (!busExists)
+      {
+        return NotFound(new
+        {
+          message = "Bus not found."
+        });
+      }
+
       var bus = await _context.Buses
           .FirstOrDefaultAsync(b => b.BusId == id);
 
@@ -234,8 +271,9 @@ namespace STMS.Api.Controllers
         });
       }
 
-      // Load assigned routes and check status in C#
-      // to avoid Oracle Boolean translation issues
+      // Read routes after acquiring the bus lock.
+      // Check IsActive in C# to avoid Oracle
+      // Boolean translation issues.
       var assignedRoutes = await _context.Routes
           .AsNoTracking()
           .Where(r => r.BusId == id)
@@ -250,13 +288,15 @@ namespace STMS.Api.Controllers
       {
         return Conflict(new
         {
-          message = "Cannot deactivate a bus assigned to an active route."
+          message =
+                "Cannot deactivate a bus assigned to an active route."
         });
       }
 
       bus.IsActive = false;
 
       await _context.SaveChangesAsync();
+      await transaction.CommitAsync();
 
       return Ok(new
       {
@@ -266,11 +306,24 @@ namespace STMS.Api.Controllers
     }
 
     // PATCH /api/buses/admin/{id}/activate
-    // Admin: Activate a bus
+    // Admin: Activate an inactive bus.
     [HttpPatch("admin/{id:int}/activate")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ActivateBus(int id)
     {
+      await using var transaction =
+          await _context.Database.BeginTransactionAsync();
+
+      var busExists = await LockBusAsync(id);
+
+      if (!busExists)
+      {
+        return NotFound(new
+        {
+          message = "Bus not found."
+        });
+      }
+
       var bus = await _context.Buses
           .FirstOrDefaultAsync(b => b.BusId == id);
 
@@ -293,12 +346,51 @@ namespace STMS.Api.Controllers
       bus.IsActive = true;
 
       await _context.SaveChangesAsync();
+      await transaction.CommitAsync();
 
       return Ok(new
       {
         message = "Bus activated successfully.",
         busId = bus.BusId
       });
+    }
+
+    // ============================================
+    // HELPERS
+    // ============================================
+
+    // Lock an existing bus row in Oracle.
+    // An EF Core transaction must already be active.
+    private async Task<bool> LockBusAsync(int busId)
+    {
+      var currentTransaction =
+          _context.Database.CurrentTransaction
+          ?? throw new InvalidOperationException(
+              "An active transaction is required.");
+
+      var connection = _context.Database.GetDbConnection();
+
+      await using var command = connection.CreateCommand();
+
+      command.Transaction =
+          currentTransaction.GetDbTransaction();
+
+      command.CommandText =
+          "SELECT BUSID FROM BUSES " +
+          "WHERE BUSID = :id FOR UPDATE";
+
+      command.CommandTimeout = 30;
+
+      var parameter = command.CreateParameter();
+      parameter.ParameterName = "id";
+      parameter.Value = busId;
+
+      command.Parameters.Add(parameter);
+
+      await using var reader =
+          await command.ExecuteReaderAsync();
+
+      return await reader.ReadAsync();
     }
   }
 }
