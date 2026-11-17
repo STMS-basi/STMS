@@ -222,8 +222,8 @@ namespace STMS.Api.Controllers
           });
         }
 
-        // FIX: Check IsActive in C# instead of Oracle SQL.
-        // The bus row is locked before this check.
+        // Check active bus assignments in C#.
+        // Avoid Oracle Boolean translation issues.
         var busRoutes = await _context.Routes
             .AsNoTracking()
             .Where(r => r.BusId == request.BusId.Value)
@@ -255,12 +255,13 @@ namespace STMS.Api.Controllers
 
       if (request.DriverId.HasValue)
       {
-        var driverExists = await _context.Drivers
-            .AnyAsync(d =>
-                d.DriverId == request.DriverId.Value &&
-                d.IsActive);
+        // FIX: Fetch driver first, then check IsActive in C#.
+        var assignedDriver = await _context.Drivers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d =>
+                d.DriverId == request.DriverId.Value);
 
-        if (!driverExists)
+        if (assignedDriver == null || !assignedDriver.IsActive)
         {
           return BadRequest(new
           {
@@ -410,8 +411,7 @@ namespace STMS.Api.Controllers
           });
         }
 
-        // FIX: Check IsActive in C#.
-        // Inactive routes may share a bus until activation.
+        // Only active routes must have an exclusive bus.
         if (route.IsActive)
         {
           var busRoutes = await _context.Routes
@@ -437,12 +437,13 @@ namespace STMS.Api.Controllers
 
       if (request.DriverId.HasValue)
       {
-        var driverExists = await _context.Drivers
-            .AnyAsync(d =>
-                d.DriverId == request.DriverId.Value &&
-                d.IsActive);
+        // FIX: Avoid AnyAsync with IsActive.
+        var assignedDriver = await _context.Drivers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d =>
+                d.DriverId == request.DriverId.Value);
 
-        if (!driverExists)
+        if (assignedDriver == null || !assignedDriver.IsActive)
         {
           return BadRequest(new
           {
@@ -654,7 +655,7 @@ namespace STMS.Api.Controllers
         });
       }
 
-      // FIX: Check other active routes in C#.
+      // Prevent two active routes sharing one bus.
       var busRoutes = await _context.Routes
           .AsNoTracking()
           .Where(r =>
@@ -676,12 +677,13 @@ namespace STMS.Api.Controllers
 
       if (route.DriverId.HasValue)
       {
-        var driverExists = await _context.Drivers
-            .AnyAsync(d =>
-                d.DriverId == route.DriverId.Value &&
-                d.IsActive);
+        // FIX: Check driver status after loading the entity.
+        var assignedDriver = await _context.Drivers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d =>
+                d.DriverId == route.DriverId.Value);
 
-        if (!driverExists)
+        if (assignedDriver == null || !assignedDriver.IsActive)
         {
           return BadRequest(new
           {
