@@ -73,4 +73,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./payment-status/payment-status').then((m) => m.PaymentStatus),
   },
+
+  // Admin Dashboard
+  {
+    path: 'admin-dashboard',
+    loadComponent: () =>
+      import('./admin-dashboard/admin-dashboard').then(
+        (m) => m.AdminDashboard
+      ),
+  },
 ];

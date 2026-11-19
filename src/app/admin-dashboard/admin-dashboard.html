@@ -1,0 +1,189 @@
+
+<div
+  class="admin-page"
+  [attr.dir]="prefs.lang() === 'ar' ? 'rtl' : 'ltr'"
+>
+  <app-header />
+
+  <main class="dashboard-container">
+
+    <!-- Page Heading -->
+    <section class="dashboard-heading">
+      <div>
+        <h1>{{ translate('Admin Dashboard') }}</h1>
+        <p>{{ translate('Welcome back, Administrator') }}</p>
+        <p class="heading-description">
+          {{ translate('Here is an overview of your school transportation system.') }}
+        </p>
+      </div>
+    </section>
+
+    
+    <!-- Summary Cards -->
+    <section class="stats-grid">
+      @for (stat of stats; track stat.title) {
+        <div class="stat-card" [class]="stat.color">
+          <div class="stat-icon">{{ stat.icon }}</div>
+
+          <div class="stat-info">
+            <h3>{{ translate(stat.title) }}</h3>
+            <p class="stat-number">{{ stat.value }}</p>
+          </div>
+        </div>
+      }
+    </section>
+
+
+    <!-- Management Section -->
+    <section class="management-section">
+      <div class="section-heading">
+        <h2>{{ translate('Management') }}</h2>
+        <p>
+          {{ translate('Quick access to transportation system management.') }}
+        </p>
+      </div>
+
+      <div class="management-grid">
+        @for (item of managementLinks; track item.title) {
+          <div class="management-card">
+            <div class="management-icon">{{ item.icon }}</div>
+
+            <div class="management-info">
+              <h3>{{ translate(item.title) }}</h3>
+              <p>{{ translate(item.description) }}</p>
+            </div>
+
+            @if (item.available) {
+              <a [routerLink]="item.route" class="management-link">
+                {{ translate('View Page') }}
+              </a>
+            } @else {
+              <span class="coming-soon">
+                {{ translate('Coming Soon') }}
+              </span>
+            }
+          </div>
+        }
+      </div>
+    </section>
+
+
+    <!-- Recent Requests -->
+    <section class="requests-section">
+      <div class="section-heading">
+        <h2>{{ translate('Recent Subscription Requests') }}</h2>
+        <p>
+          {{ translate('View all recent requests submitted by parents.') }}
+        </p>
+      </div>
+
+      <div class="table-container">
+        <table class="requests-table">
+          <thead>
+            <tr>
+              <th>{{ translate('Request ID') }}</th>
+              <th>{{ translate('Student') }}</th>
+              <th>{{ translate('Parent / Guardian') }}</th>
+              <th>{{ translate('Route') }}</th>
+              <th>{{ translate('Date') }}</th>
+              <th>{{ translate('Status') }}</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            @for (request of recentRequests; track request.id) {
+              <tr>
+                <td>{{ request.id }}</td>
+                <td>{{ request.student }}</td>
+                <td>{{ request.parent }}</td>
+                <td>{{ translate(request.route) }}</td>
+                <td>{{ request.date }}</td>
+                <td>
+                  <span
+                    class="status-badge"
+                    [class]="getStatusClass(request.status)"
+                  >
+                    {{ getStatusLabel(request.status) }}
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+
+    <!-- Transportation Overview -->
+    <section class="overview-section">
+      <div class="section-heading">
+        <h2>{{ translate('Transportation Overview') }}</h2>
+      </div>
+
+      <div class="overview-grid">
+
+        <!-- Bus Capacity -->
+        <div class="overview-card">
+          <h3>{{ translate('Bus Capacity') }}</h3>
+
+          <div class="capacity-numbers">
+            <span>{{ capacityPercentage | number:'1.0-0' }}%</span>
+          </div>
+
+          <div class="capacity-bar">
+            <div
+              class="capacity-progress"
+              [style.width.%]="capacityPercentage"
+            ></div>
+          </div>
+
+          <p class="capacity-note">
+            {{ capacity.occupied }} / {{ capacity.total }}
+            {{ translate('Total Capacity') }}
+          </p>
+
+          <div class="capacity-details">
+            <p>
+              <span>{{ translate('Occupied Seats') }}</span>
+              <strong>{{ capacity.occupied }}</strong>
+            </p>
+
+            <p>
+              <span>{{ translate('Available Seats') }}</span>
+              <strong>{{ capacity.available }}</strong>
+            </p>
+          </div>
+        </div>
+
+
+        <!-- Subscription Status -->
+        <div class="overview-card">
+          <h3>{{ translate('Subscription Status') }}</h3>
+
+          <div class="subscription-status-list">
+            @for (status of subscriptionStatuses; track status.name) {
+              <div class="subscription-status-item">
+                <span>{{ translate(status.name) }}</span>
+
+                <div class="subscription-status-count">
+                  <strong>{{ status.count }}</strong>
+                  <span>{{ translate('subscriptions') }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+
+
+  <footer class="dashboard-footer">
+    <p>
+      {{ translate('© 2026 Basi School Transportation. All rights reserved.') }}
+    </p>
+  </footer>
+</div>
