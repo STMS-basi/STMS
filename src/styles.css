@@ -50,7 +50,9 @@
   --text-emergency: #fde68a;
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -92,6 +94,7 @@ button {
   border: 1px solid transparent;
   transition: all 0.2s ease-in-out;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .btn-primary {
@@ -373,7 +376,8 @@ select.form-input,
   box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.08);
 }
 
-.tag, .category-pill {
+.tag,
+.category-pill {
   display: inline-block;
   background-color: var(--primary-light);
   color: var(--primary-text);
@@ -555,4 +559,200 @@ select.form-input,
   color: var(--text-subtle);
   font-size: 0.8rem;
   margin-top: 0.75rem;
+}
+
+
+/* Admin & Table Global Utilities */
+.table-container {
+  overflow-x: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  margin-bottom: 2rem;
+}
+
+.requests-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: start;
+  white-space: nowrap;
+}
+
+.requests-table thead {
+  background: var(--bg-alt);
+}
+
+.requests-table th {
+  padding: 0.85rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 750;
+  text-align: start;
+}
+
+.requests-table td {
+  padding: 0.9rem 1rem;
+  color: var(--text-main);
+  border-top: 1px solid var(--border-color);
+  font-size: 0.86rem;
+}
+
+.requests-table tbody tr:hover {
+  background: var(--bg-alt);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.status-badge.status-pending {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.status-badge.status-approved {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.status-badge.status-rejected {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+[data-theme="dark"] .status-badge.status-pending {
+  color: #fcd34d;
+  background: #422006;
+}
+
+[data-theme="dark"] .status-badge.status-approved {
+  color: #86efac;
+  background: #12351f;
+}
+
+[data-theme="dark"] .status-badge.status-rejected {
+  color: #fca5a5;
+  background: #451a1a;
+}
+
+.action-buttons-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.btn-sm {
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.15s ease;
+}
+
+.btn-success {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.btn-success:hover {
+  background: #15803d;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
+.pill-btn {
+  padding: 0.35rem 0.8rem;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pill-btn:hover {
+  color: var(--text-main);
+}
+
+.pill-btn.active {
+  background: var(--primary);
+  color: #111827;
+  border-color: var(--primary);
+}
+
+
+/* Global Page & Hero Section System */
+.page-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+.hero-section {
+  background: var(--hero-bg);
+  padding: 4.5rem 1.5rem 3.5rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.hero-container {
+  max-width: 840px;
+  margin: 0 auto;
+}
+
+.hero-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1.25;
+  margin-bottom: 1rem;
+}
+
+.hero-description {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  margin-bottom: 2rem;
+  max-width: 700px;
+  margin-inline: auto;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .hero-section {
+    padding: 3rem 1.25rem 2.5rem;
+  }
+  .hero-title {
+    font-size: 2rem;
+  }
+  .hero-description {
+    font-size: 1rem;
+    margin-bottom: 1.5rem;
+  }
 }

@@ -5,10 +5,10 @@
   <main>
 
     <!-- Hero Section -->
-    <section class="hero-section">
+    <section class="hero-section" aria-labelledby="routes-hero-title">
       <div class="hero-container">
 
-        <h1 class="hero-title">
+        <h1 id="routes-hero-title" class="hero-title">
           {{ translate('School Routes and Stops') }}
         </h1>
 
@@ -17,8 +17,11 @@
         </p>
 
         <div class="hero-actions">
-          <a routerLink="/transport" class="btn btn-primary">
+          <a routerLink="/transport" class="btn btn-primary btn-lg">
             {{ translate('View Services') }}
+          </a>
+          <a routerLink="/subscription" class="btn btn-secondary btn-lg">
+            {{ translate('Request Transportation') }}
           </a>
         </div>
 

@@ -1,4 +1,3 @@
-
 <div
   class="admin-page"
   [attr.dir]="prefs.lang() === 'ar' ? 'rtl' : 'ltr'"
@@ -18,172 +17,909 @@
       </div>
     </section>
 
-    
-    <!-- Summary Cards -->
-    <section class="stats-grid">
-      @for (stat of stats; track stat.title) {
-        <div class="stat-card" [class]="stat.color">
-          <div class="stat-icon">{{ stat.icon }}</div>
-
-          <div class="stat-info">
-            <h3>{{ translate(stat.title) }}</h3>
-            <p class="stat-number">{{ stat.value }}</p>
-          </div>
-        </div>
+    <!-- Navigation Tabs -->
+    <nav class="admin-tabs" aria-label="Admin Navigation Tabs">
+      @for (tab of tabs; track tab.id) {
+        <button
+          type="button"
+          class="tab-btn"
+          [class.active]="activeTab() === tab.id"
+          (click)="setTab(tab.id)"
+        >
+          {{ prefs.lang() === 'ar' ? tab.labelAr : tab.labelEn }}
+        </button>
       }
-    </section>
+    </nav>
 
-
-    <!-- Management Section -->
-    <section class="management-section">
-      <div class="section-heading">
-        <h2>{{ translate('Management') }}</h2>
-        <p>
-          {{ translate('Quick access to transportation system management.') }}
-        </p>
-      </div>
-
-      <div class="management-grid">
-        @for (item of managementLinks; track item.title) {
-          <div class="management-card">
-            <div class="management-icon">{{ item.icon }}</div>
-
-            <div class="management-info">
-              <h3>{{ translate(item.title) }}</h3>
-              <p>{{ translate(item.description) }}</p>
-            </div>
-
-            @if (item.available) {
-              <a [routerLink]="item.route" class="management-link">
-                {{ translate('View Page') }}
-              </a>
-            } @else {
-              <span class="coming-soon">
-                {{ translate('Coming Soon') }}
-              </span>
-            }
+    <!-- OVERVIEW TAB -->
+    @if (activeTab() === 'overview') {
+      <!-- Summary Cards -->
+      <section class="stats-grid">
+        <div class="stat-card blue">
+          <div class="stat-icon blue">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+              <path d="M6 12v5c0 2 3 3 6 3s6-1 6-3v-5"/>
+            </svg>
           </div>
-        }
-      </div>
-    </section>
-
-
-    <!-- Recent Requests -->
-    <section class="requests-section">
-      <div class="section-heading">
-        <h2>{{ translate('Recent Subscription Requests') }}</h2>
-        <p>
-          {{ translate('View all recent requests submitted by parents.') }}
-        </p>
-      </div>
-
-      <div class="table-container">
-        <table class="requests-table">
-          <thead>
-            <tr>
-              <th>{{ translate('Request ID') }}</th>
-              <th>{{ translate('Student') }}</th>
-              <th>{{ translate('Parent / Guardian') }}</th>
-              <th>{{ translate('Route') }}</th>
-              <th>{{ translate('Date') }}</th>
-              <th>{{ translate('Status') }}</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            @for (request of recentRequests; track request.id) {
-              <tr>
-                <td>{{ request.id }}</td>
-                <td>{{ request.student }}</td>
-                <td>{{ request.parent }}</td>
-                <td>{{ translate(request.route) }}</td>
-                <td>{{ request.date }}</td>
-                <td>
-                  <span
-                    class="status-badge"
-                    [class]="getStatusClass(request.status)"
-                  >
-                    {{ getStatusLabel(request.status) }}
-                  </span>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-
-    <!-- Transportation Overview -->
-    <section class="overview-section">
-      <div class="section-heading">
-        <h2>{{ translate('Transportation Overview') }}</h2>
-      </div>
-
-      <div class="overview-grid">
-
-        <!-- Bus Capacity -->
-        <div class="overview-card">
-          <h3>{{ translate('Bus Capacity') }}</h3>
-
-          <div class="capacity-numbers">
-            <span>{{ capacityPercentage | number:'1.0-0' }}%</span>
-          </div>
-
-          <div class="capacity-bar">
-            <div
-              class="capacity-progress"
-              [style.width.%]="capacityPercentage"
-            ></div>
-          </div>
-
-          <p class="capacity-note">
-            {{ capacity.occupied }} / {{ capacity.total }}
-            {{ translate('Total Capacity') }}
-          </p>
-
-          <div class="capacity-details">
-            <p>
-              <span>{{ translate('Occupied Seats') }}</span>
-              <strong>{{ capacity.occupied }}</strong>
-            </p>
-
-            <p>
-              <span>{{ translate('Available Seats') }}</span>
-              <strong>{{ capacity.available }}</strong>
-            </p>
+          <div class="stat-info">
+            <h3>{{ translate('Total Students') }}</h3>
+            <p class="stat-number">{{ adminService.totalStudents() }}</p>
           </div>
         </div>
 
+        <div class="stat-card green">
+          <div class="stat-icon green">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <h3>{{ translate('Active Subscriptions') }}</h3>
+            <p class="stat-number">{{ adminService.activeSubscriptions() }}</p>
+          </div>
+        </div>
 
-        <!-- Subscription Status -->
-        <div class="overview-card">
-          <h3>{{ translate('Subscription Status') }}</h3>
+        <div class="stat-card orange">
+          <div class="stat-icon orange">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="15" rx="2"/>
+              <path d="M7 18v3M17 18v3M3 10h18M8 14h.01M16 14h.01"/>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <h3>{{ translate('Available Buses') }}</h3>
+            <p class="stat-number">{{ adminService.availableBuses() }}</p>
+          </div>
+        </div>
 
-          <div class="subscription-status-list">
-            @for (status of subscriptionStatuses; track status.name) {
-              <div class="subscription-status-item">
-                <span>{{ translate(status.name) }}</span>
+        <div class="stat-card purple">
+          <div class="stat-icon purple">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <h3>{{ translate('Pending Requests') }}</h3>
+            <p class="stat-number">{{ adminService.pendingRequests() }}</p>
+          </div>
+        </div>
+      </section>
 
-                <div class="subscription-status-count">
-                  <strong>{{ status.count }}</strong>
-                  <span>{{ translate('subscriptions') }}</span>
-                </div>
+      <!-- Management Sections Grid -->
+      <section class="management-section">
+        <div class="section-heading">
+          <div>
+            <h2>{{ translate('Management Sections') }}</h2>
+            <p>{{ translate('Quick access to school transportation system management.') }}</p>
+          </div>
+        </div>
+
+        <div class="management-grid">
+          @for (item of managementCards; track item.tab) {
+            <div class="management-card" (click)="setTab(item.tab)" role="button" tabindex="0">
+              <div class="management-icon">
+                @switch (item.tab) {
+                  @case ('students') {
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                      <path d="M6 12v5c0 2 3 3 6 3s6-1 6-3v-5"/>
+                    </svg>
+                  }
+                  @case ('parents') {
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                      <circle cx="9" cy="7" r="4"/>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                    </svg>
+                  }
+                  @case ('routes') {
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+                      <line x1="8" y1="2" x2="8" y2="18"/>
+                    </svg>
+                  }
+                  @case ('stops') {
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                      <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                  }
+                  @case ('buses') {
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="18" height="15" rx="2"/>
+                      <path d="M7 18v3M17 18v3M3 10h18"/>
+                    </svg>
+                  }
+                  @case ('drivers') {
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="7" r="4"/>
+                      <path d="M5.5 21a6.5 6.5 0 0 1 13 0M12 14v4M10 16h4"/>
+                    </svg>
+                  }
+                  @case ('subscriptions') {
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <line x1="16" y1="13" x2="8" y2="13"/>
+                    </svg>
+                  }
+                  @case ('payments') {
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="2" y="4" width="20" height="16" rx="2"/>
+                      <line x1="2" y1="10" x2="22" y2="10"/>
+                    </svg>
+                  }
+                }
               </div>
-            }
+
+              <div class="management-info">
+                <h3>{{ prefs.lang() === 'ar' ? item.titleAr : item.titleEn }}</h3>
+                <p>{{ prefs.lang() === 'ar' ? item.descAr : item.descEn }}</p>
+              </div>
+
+              <button type="button" class="management-link-btn">
+                {{ translate('Manage Section') }}
+              </button>
+            </div>
+          }
+        </div>
+      </section>
+
+      <!-- Recent Requests -->
+      <section class="requests-section">
+        <div class="section-heading">
+          <div>
+            <h2>{{ translate('Recent Subscription Requests') }}</h2>
+            <p>{{ translate('Review recent transportation requests submitted by parents.') }}</p>
           </div>
         </div>
 
-      </div>
-    </section>
+        <div class="table-container">
+          <table class="requests-table">
+            <thead>
+              <tr>
+                <th>{{ translate('Reference') }}</th>
+                <th>{{ translate('Student') }}</th>
+                <th>{{ translate('Parent / Guardian') }}</th>
+                <th>{{ translate('Route') }}</th>
+                <th>{{ translate('Date') }}</th>
+                <th>{{ translate('Status') }}</th>
+                <th>{{ translate('Actions') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (req of recentRequests(); track req.subscriptionId) {
+                <tr>
+                  <td><strong>{{ req.referenceNumber }}</strong></td>
+                  <td>{{ req.studentName }}</td>
+                  <td>{{ req.parentName }}</td>
+                  <td>{{ req.routeNumber }} {{ req.routeName }}</td>
+                  <td>{{ req.requestedAt }}</td>
+                  <td>
+                    <span class="status-badge" [class]="getStatusClass(req.status)">
+                      {{ translate(req.status) }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="action-buttons-inline">
+                      @if (req.status === 'Pending') {
+                        <button type="button" class="btn-sm btn-success" (click)="approveSubscription(req.subscriptionId)">
+                          {{ translate('Approve') }}
+                        </button>
+                        <button type="button" class="btn-sm btn-danger" (click)="rejectSubscription(req.subscriptionId)">
+                          {{ translate('Reject') }}
+                        </button>
+                      } @else {
+                        <span class="text-muted">{{ translate(req.status) }}</span>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Transportation Overview -->
+      <section class="overview-section">
+        <div class="section-heading">
+          <h2>{{ translate('Transportation Overview') }}</h2>
+        </div>
+
+        <div class="overview-grid">
+          <!-- Bus Capacity -->
+          <div class="overview-card">
+            <h3>{{ translate('Bus Capacity') }}</h3>
+            <div class="capacity-numbers">
+              <span>{{ capacityPercentage() | number:'1.0-0' }}%</span>
+            </div>
+            <div class="capacity-bar">
+              <div class="capacity-progress" [style.width.%]="capacityPercentage()"></div>
+            </div>
+            <p class="capacity-note">
+              {{ adminService.occupiedCapacity() }} / {{ adminService.totalCapacity() }}
+              {{ translate('Total Capacity') }}
+            </p>
+            <div class="capacity-details">
+              <p>
+                <span>{{ translate('Occupied Seats') }}</span>
+                <strong>{{ adminService.occupiedCapacity() }}</strong>
+              </p>
+              <p>
+                <span>{{ translate('Available Seats') }}</span>
+                <strong>{{ adminService.totalCapacity() - adminService.occupiedCapacity() }}</strong>
+              </p>
+            </div>
+          </div>
+
+          <!-- Subscription Status -->
+          <div class="overview-card">
+            <h3>{{ translate('Subscription Status') }}</h3>
+            <div class="subscription-status-list">
+              <div class="subscription-status-item">
+                <span>{{ translate('Approved') }}</span>
+                <strong>{{ adminService.activeSubscriptions() }}</strong>
+              </div>
+              <div class="subscription-status-item">
+                <span>{{ translate('Pending') }}</span>
+                <strong>{{ adminService.pendingRequests() }}</strong>
+              </div>
+              <div class="subscription-status-item">
+                <span>{{ translate('Total Students') }}</span>
+                <strong>{{ adminService.totalStudents() }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+
+    <!-- STUDENTS MANAGEMENT TAB -->
+    @if (activeTab() === 'students') {
+      <section class="management-view">
+        <div class="section-heading">
+          <div>
+            <h2>{{ translate('Student Management') }}</h2>
+            <p>{{ translate('View and manage student transportation records.') }}</p>
+          </div>
+          <div class="search-box">
+            <input
+              type="text"
+              class="form-input"
+              [placeholder]="translate('Search by name, grade or route')"
+              [value]="studentSearch()"
+              (input)="studentSearch.set($any($event.target).value)"
+            />
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="requests-table">
+            <thead>
+              <tr>
+                <th>{{ translate('Student') }}</th>
+                <th>{{ translate('Parent / Guardian') }}</th>
+                <th>{{ translate('Grade') }}</th>
+                <th>{{ translate('Class') }}</th>
+                <th>{{ translate('Route') }}</th>
+                <th>{{ translate('Stop') }}</th>
+                <th>{{ translate('Transport Type') }}</th>
+                <th>{{ translate('Status') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (st of filteredStudents(); track st.studentId) {
+                <tr>
+                  <td><strong>{{ st.fullName }}</strong></td>
+                  <td>{{ st.parentName }}</td>
+                  <td>{{ st.grade }}</td>
+                  <td>{{ st.className }}</td>
+                  <td>{{ st.routeNumber }} {{ st.routeName }}</td>
+                  <td>{{ st.stopName }}</td>
+                  <td>{{ translate(st.transportType) }}</td>
+                  <td>
+                    <span class="status-badge" [class]="getStatusClass(st.status)">
+                      {{ translate(st.status) }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <!-- PARENTS MANAGEMENT TAB -->
+    @if (activeTab() === 'parents') {
+      <section class="management-view">
+        <div class="section-heading">
+          <div>
+            <h2>{{ translate('Parent Management') }}</h2>
+            <p>{{ translate('View registered parent and guardian records.') }}</p>
+          </div>
+          <div class="search-box">
+            <input
+              type="text"
+              class="form-input"
+              [placeholder]="translate('Search by name, email or phone')"
+              [value]="parentSearch()"
+              (input)="parentSearch.set($any($event.target).value)"
+            />
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="requests-table">
+            <thead>
+              <tr>
+                <th>{{ translate('Parent / Guardian') }}</th>
+                <th>Email</th>
+                <th>{{ translate('Phone') }}</th>
+                <th>{{ translate('Address') }}</th>
+                <th>{{ translate('Students') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (pr of filteredParents(); track pr.parentId) {
+                <tr>
+                  <td><strong>{{ pr.fullName }}</strong></td>
+                  <td>{{ pr.email }}</td>
+                  <td>{{ pr.phone }}</td>
+                  <td>{{ pr.address }}</td>
+                  <td><strong>{{ pr.studentsCount }}</strong></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <!-- ROUTES MANAGEMENT TAB -->
+    @if (activeTab() === 'routes') {
+      <section class="management-view">
+        <div class="section-heading">
+          <div>
+            <h2>{{ translate('Route Management') }}</h2>
+            <p>{{ translate('Add, edit, activate and deactivate routes.') }}</p>
+          </div>
+          <button type="button" class="btn btn-primary" (click)="showAddRoute.set(!showAddRoute())">
+            {{ showAddRoute() ? translate('Cancel') : translate('Add Route') }}
+          </button>
+        </div>
+
+        @if (showAddRoute()) {
+          <form [formGroup]="routeForm" (ngSubmit)="submitNewRoute()" class="inline-add-card">
+            <h3>{{ translate('Add Route') }}</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">{{ translate('Route Number') }}</label>
+                <input class="form-input" formControlName="routeNumber" placeholder="e.g. R105" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">{{ translate('Route Name') }}</label>
+                <input class="form-input" formControlName="name" placeholder="e.g. South Amman Route" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">{{ translate('Area') }}</label>
+                <input class="form-input" formControlName="serviceArea" placeholder="e.g. South Amman" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">{{ translate('Start Point') }}</label>
+                <input class="form-input" formControlName="startPoint" placeholder="e.g. Al Muqabalain" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">{{ translate('Destination') }}</label>
+                <input class="form-input" formControlName="destination" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">{{ translate('Capacity') }}</label>
+                <input type="number" class="form-input" formControlName="capacity" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">{{ translate('Bus Plate') }}</label>
+                <input class="form-input" formControlName="busPlate" placeholder="e.g. 50 99881" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">{{ translate('Driver') }}</label>
+                <input class="form-input" formControlName="driverName" placeholder="e.g. Driver Sami" />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">{{ translate('Save') }}</button>
+          </form>
+        }
+
+        <div class="table-container">
+          <table class="requests-table">
+            <thead>
+              <tr>
+                <th>{{ translate('Route Number') }}</th>
+                <th>{{ translate('Route Name') }}</th>
+                <th>{{ translate('Area') }}</th>
+                <th>{{ translate('Start Point') }}</th>
+                <th>{{ translate('Destination') }}</th>
+                <th>{{ translate('Capacity') }}</th>
+                <th>{{ translate('Bus Plate') }}</th>
+                <th>{{ translate('Driver') }}</th>
+                <th>{{ translate('Status') }}</th>
+                <th>{{ translate('Actions') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (rt of adminService.routes(); track rt.routeId) {
+                <tr>
+                  <td><strong>{{ rt.routeNumber }}</strong></td>
+                  <td>{{ rt.name }}</td>
+                  <td>{{ rt.serviceArea }}</td>
+                  <td>{{ rt.startPoint }}</td>
+                  <td>{{ rt.destination }}</td>
+                  <td>{{ rt.enrolledStudents }} / {{ rt.capacity }}</td>
+                  <td>{{ rt.busPlate }}</td>
+                  <td>{{ rt.driverName }}</td>
+                  <td>
+                    <span class="status-badge" [class]="rt.isActive ? 'status-approved' : 'status-rejected'">
+                      {{ rt.isActive ? translate('Active') : translate('Inactive') }}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      class="btn-sm"
+                      [class]="rt.isActive ? 'btn-danger' : 'btn-success'"
+                      (click)="toggleRoute(rt.routeId)"
+                    >
+                      {{ rt.isActive ? translate('Deactivate') : translate('Activate') }}
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <!-- STOPS MANAGEMENT TAB -->
+    @if (activeTab() === 'stops') {
+      <section class="management-view">
+        <div class="section-heading">
+          <div>
+            <h2>{{ translate('Stop Management') }}</h2>
+            <p>{{ translate('Manage pickup and drop off stops.') }}</p>
+          </div>
+          <button type="button" class="btn btn-primary" (click)="showAddStop.set(!showAddStop())">
+            {{ showAddStop() ? translate('Cancel') : translate('Add Stop') }}
+          </button>
+        </div>
+
+        @if (showAddStop()) {
+          <form [formGroup]="stopForm" (ngSubmit)="submitNewStop()" class="inline-add-card">
+            <h3>{{ translate('Add Stop') }}</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">{{ translate('Route') }}</label>
+                <select class="form-input" formControlName="routeId">
+                  @for (r of adminService.routes(); track r.routeId) {
+                    <option [value]="r.routeId">{{ r.routeNumber }} {{ r.name }}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">{{ translate('Stop') }}</label>
+                <input class="form-input" formControlName="name" placeholder="e.g. 7th Circle" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">{{ translate('Order') }}</label>
+                <input type="number" class="form-input" formControlName="stopOrder" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">{{ translate('Pickup Time') }}</label>
+                <input class="form-input" formControlName="pickupTime" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">{{ translate('Dropoff Time') }}</label>
+                <input class="form-input" formControlName="dropoffTime" />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">{{ translate('Save') }}</button>
+          </form>
+        }
+
+        <div class="table-container">
+          <table class="requests-table">
+            <thead>
+              <tr>
+                <th>{{ translate('Route') }}</th>
+                <th>{{ translate('Stop') }}</th>
+                <th>{{ translate('Order') }}</th>
+                <th>{{ translate('Pickup Time') }}</th>
+                <th>{{ translate('Dropoff Time') }}</th>
+                <th>{{ translate('Actions') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (st of adminService.stops(); track st.stopId) {
+                <tr>
+                  <td><strong>{{ st.routeNumber }}</strong></td>
+                  <td>{{ st.name }}</td>
+                  <td>{{ st.stopOrder }}</td>
+                  <td>{{ st.pickupTime }}</td>
+                  <td>{{ st.dropoffTime }}</td>
+                  <td>
+                    <button type="button" class="btn-sm btn-danger" (click)="deleteStop(st.stopId)">
+                      {{ translate('Delete') }}
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <!-- BUSES MANAGEMENT TAB -->
+    @if (activeTab() === 'buses') {
+      <section class="management-view">
+        <div class="section-heading">
+          <div>
+            <h2>{{ translate('Bus Management') }}</h2>
+            <p>{{ translate('Add and update buses and seating capacity.') }}</p>
+          </div>
+          <button type="button" class="btn btn-primary" (click)="showAddBus.set(!showAddBus())">
+            {{ showAddBus() ? translate('Cancel') : translate('Add Bus') }}
+          </button>
+        </div>
+
+        @if (showAddBus()) {
+          <form [formGroup]="busForm" (ngSubmit)="submitNewBus()" class="inline-add-card">
+            <h3>{{ translate('Add Bus') }}</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">{{ translate('Plate Number') }}</label>
+                <input class="form-input" formControlName="plateNumber" placeholder="e.g. 50 88291" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">{{ translate('Capacity') }}</label>
+                <input type="number" class="form-input" formControlName="capacity" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">{{ translate('Assigned Route') }}</label>
+                <input class="form-input" formControlName="assignedRoute" placeholder="e.g. R105 South Route" />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">{{ translate('Save') }}</button>
+          </form>
+        }
+
+        <div class="table-container">
+          <table class="requests-table">
+            <thead>
+              <tr>
+                <th>{{ translate('Plate Number') }}</th>
+                <th>{{ translate('Capacity') }}</th>
+                <th>{{ translate('Assigned Route') }}</th>
+                <th>{{ translate('Status') }}</th>
+                <th>{{ translate('Actions') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (bs of adminService.buses(); track bs.busId) {
+                <tr>
+                  <td><strong>{{ bs.plateNumber }}</strong></td>
+                  <td>{{ bs.capacity }}</td>
+                  <td>{{ bs.assignedRoute }}</td>
+                  <td>
+                    <span class="status-badge" [class]="bs.isActive ? 'status-approved' : 'status-rejected'">
+                      {{ bs.isActive ? translate('Active') : translate('Inactive') }}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      class="btn-sm"
+                      [class]="bs.isActive ? 'btn-danger' : 'btn-success'"
+                      (click)="toggleBus(bs.busId)"
+                    >
+                      {{ bs.isActive ? translate('Deactivate') : translate('Activate') }}
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <!-- DRIVERS MANAGEMENT TAB -->
+    @if (activeTab() === 'drivers') {
+      <section class="management-view">
+        <div class="section-heading">
+          <div>
+            <h2>{{ translate('Driver Management') }}</h2>
+            <p>{{ translate('Manage driver information and assignments.') }}</p>
+          </div>
+          <button type="button" class="btn btn-primary" (click)="showAddDriver.set(!showAddDriver())">
+            {{ showAddDriver() ? translate('Cancel') : translate('Add Driver') }}
+          </button>
+        </div>
+
+        @if (showAddDriver()) {
+          <form [formGroup]="driverForm" (ngSubmit)="submitNewDriver()" class="inline-add-card">
+            <h3>{{ translate('Add Driver') }}</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">{{ translate('Driver') }}</label>
+                <input class="form-input" formControlName="fullName" placeholder="e.g. Driver Zaid" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">{{ translate('Phone') }}</label>
+                <input class="form-input" formControlName="phone" placeholder="e.g. 0795557788" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">{{ translate('License Number') }}</label>
+                <input class="form-input" formControlName="licenseNumber" placeholder="e.g. LIC 2023 519" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">{{ translate('Assigned Bus') }}</label>
+                <input class="form-input" formControlName="assignedBus" placeholder="e.g. 50 12345" />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">{{ translate('Save') }}</button>
+          </form>
+        }
+
+        <div class="table-container">
+          <table class="requests-table">
+            <thead>
+              <tr>
+                <th>{{ translate('Driver') }}</th>
+                <th>{{ translate('Phone') }}</th>
+                <th>{{ translate('License Number') }}</th>
+                <th>{{ translate('Assigned Bus') }}</th>
+                <th>{{ translate('Status') }}</th>
+                <th>{{ translate('Actions') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (dr of adminService.drivers(); track dr.driverId) {
+                <tr>
+                  <td><strong>{{ dr.fullName }}</strong></td>
+                  <td>{{ dr.phone }}</td>
+                  <td>{{ dr.licenseNumber }}</td>
+                  <td>{{ dr.assignedBus }}</td>
+                  <td>
+                    <span class="status-badge" [class]="dr.isActive ? 'status-approved' : 'status-rejected'">
+                      {{ dr.isActive ? translate('Active') : translate('Inactive') }}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      class="btn-sm"
+                      [class]="dr.isActive ? 'btn-danger' : 'btn-success'"
+                      (click)="toggleDriver(dr.driverId)"
+                    >
+                      {{ dr.isActive ? translate('Deactivate') : translate('Activate') }}
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <!-- SUBSCRIPTIONS MANAGEMENT TAB -->
+    @if (activeTab() === 'subscriptions') {
+      <section class="management-view">
+        <div class="section-heading">
+          <div>
+            <h2>{{ translate('Subscription Management') }}</h2>
+            <p>{{ translate('Review, approve, reject and update transportation subscriptions.') }}</p>
+          </div>
+          <div class="filter-pills">
+            <button
+              type="button"
+              class="pill-btn"
+              [class.active]="subscriptionFilter() === 'All'"
+              (click)="subscriptionFilter.set('All')"
+            >
+              {{ translate('All') }}
+            </button>
+            <button
+              type="button"
+              class="pill-btn"
+              [class.active]="subscriptionFilter() === 'Pending'"
+              (click)="subscriptionFilter.set('Pending')"
+            >
+              {{ translate('Pending') }}
+            </button>
+            <button
+              type="button"
+              class="pill-btn"
+              [class.active]="subscriptionFilter() === 'Approved'"
+              (click)="subscriptionFilter.set('Approved')"
+            >
+              {{ translate('Approved') }}
+            </button>
+            <button
+              type="button"
+              class="pill-btn"
+              [class.active]="subscriptionFilter() === 'Rejected'"
+              (click)="subscriptionFilter.set('Rejected')"
+            >
+              {{ translate('Rejected') }}
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="requests-table">
+            <thead>
+              <tr>
+                <th>{{ translate('Reference') }}</th>
+                <th>{{ translate('Student') }}</th>
+                <th>{{ translate('Parent / Guardian') }}</th>
+                <th>{{ translate('Route') }}</th>
+                <th>{{ translate('Stop') }}</th>
+                <th>{{ translate('Transport Type') }}</th>
+                <th>{{ translate('Fee') }}</th>
+                <th>{{ translate('Status') }}</th>
+                <th>{{ translate('Actions') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (sub of filteredSubscriptions(); track sub.subscriptionId) {
+                <tr>
+                  <td><strong>{{ sub.referenceNumber }}</strong></td>
+                  <td>{{ sub.studentName }}</td>
+                  <td>{{ sub.parentName }}</td>
+                  <td>{{ sub.routeNumber }} {{ sub.routeName }}</td>
+                  <td>{{ sub.stopName }}</td>
+                  <td>{{ translate(sub.transportType) }}</td>
+                  <td>{{ sub.fee }} JOD</td>
+                  <td>
+                    <span class="status-badge" [class]="getStatusClass(sub.status)">
+                      {{ translate(sub.status) }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="action-buttons-inline">
+                      @if (sub.status === 'Pending') {
+                        <button type="button" class="btn-sm btn-success" (click)="approveSubscription(sub.subscriptionId)">
+                          {{ translate('Approve') }}
+                        </button>
+                        <button type="button" class="btn-sm btn-danger" (click)="rejectSubscription(sub.subscriptionId)">
+                          {{ translate('Reject') }}
+                        </button>
+                      } @else if (sub.status === 'Approved') {
+                        <button type="button" class="btn-sm btn-danger" (click)="rejectSubscription(sub.subscriptionId)">
+                          {{ translate('Reject') }}
+                        </button>
+                      } @else {
+                        <button type="button" class="btn-sm btn-success" (click)="approveSubscription(sub.subscriptionId)">
+                          {{ translate('Approve') }}
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <!-- PAYMENTS MANAGEMENT TAB -->
+    @if (activeTab() === 'payments') {
+      <section class="management-view">
+        <div class="section-heading">
+          <div>
+            <h2>{{ translate('Payment Management') }}</h2>
+            <p>{{ translate('Record and update payment statuses.') }}</p>
+          </div>
+          <div class="filter-pills">
+            <button
+              type="button"
+              class="pill-btn"
+              [class.active]="paymentFilter() === 'All'"
+              (click)="paymentFilter.set('All')"
+            >
+              {{ translate('All') }}
+            </button>
+            <button
+              type="button"
+              class="pill-btn"
+              [class.active]="paymentFilter() === 'Paid'"
+              (click)="paymentFilter.set('Paid')"
+            >
+              {{ translate('Paid') }}
+            </button>
+            <button
+              type="button"
+              class="pill-btn"
+              [class.active]="paymentFilter() === 'Partial'"
+              (click)="paymentFilter.set('Partial')"
+            >
+              {{ translate('Partial') }}
+            </button>
+            <button
+              type="button"
+              class="pill-btn"
+              [class.active]="paymentFilter() === 'Unpaid'"
+              (click)="paymentFilter.set('Unpaid')"
+            >
+              {{ translate('Unpaid') }}
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="requests-table">
+            <thead>
+              <tr>
+                <th>{{ translate('Reference') }}</th>
+                <th>{{ translate('Student') }}</th>
+                <th>{{ translate('Parent / Guardian') }}</th>
+                <th>{{ translate('Amount Due') }}</th>
+                <th>{{ translate('Amount Paid') }}</th>
+                <th>{{ translate('Status') }}</th>
+                <th>{{ translate('Payment Date') }}</th>
+                <th>{{ translate('Actions') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (pm of filteredPayments(); track pm.paymentId) {
+                <tr>
+                  <td><strong>{{ pm.referenceNumber }}</strong></td>
+                  <td>{{ pm.studentName }}</td>
+                  <td>{{ pm.parentName }}</td>
+                  <td>{{ pm.amountDue }} JOD</td>
+                  <td>{{ pm.amountPaid }} JOD</td>
+                  <td>
+                    <span class="status-badge" [class]="getStatusClass(pm.status)">
+                      {{ translate(pm.status) }}
+                    </span>
+                  </td>
+                  <td>{{ pm.paymentDate }}</td>
+                  <td>
+                    @if (pm.status !== 'Paid') {
+                      <button type="button" class="btn-sm btn-success" (click)="markPaymentPaid(pm.paymentId)">
+                        {{ translate('Mark as Paid') }}
+                      </button>
+                    } @else {
+                      <span class="text-muted">{{ translate('Paid') }}</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
 
   </main>
 
-
-
   <footer class="dashboard-footer">
-    <p>
-      {{ translate('© 2026 Basi School Transportation. All rights reserved.') }}
-    </p>
+    <p>{{ translate('© 2026 Basi School Transportation. All rights reserved.') }}</p>
   </footer>
 </div>
