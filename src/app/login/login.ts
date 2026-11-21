@@ -59,7 +59,11 @@ export class Login {
           this.isSubmitting.set(false);
           this.successMessage.set(this.t().loginSuccess);
           setTimeout(() => {
-            void this.router.navigate(['/']);
+            if (this.authService.userRole() === 'Admin') {
+              void this.router.navigate(['/admin-dashboard']);
+            } else {
+              void this.router.navigate(['/']);
+            }
           }, 1200);
         },
         error: (err: HttpErrorResponse) => {

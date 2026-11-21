@@ -50,6 +50,31 @@
   color: var(--primary-text);
 }
 
+.nav-link-admin {
+  color: var(--primary-text);
+  font-weight: 750;
+}
+
+.user-greeting {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.65rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.mobile-user-greeting {
+  padding: 0.5rem 0;
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 0.95rem;
+}
+
 .nav-auth {
   display: flex;
   align-items: center;

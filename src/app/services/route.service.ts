@@ -1,7 +1,6 @@
-
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Observable, catchError, of, tap } from 'rxjs';
 
 export interface RouteStop {
   readonly stopId: number;
@@ -24,13 +23,84 @@ export interface RouteItem {
   readonly stops: readonly RouteStop[];
 }
 
+const DEFAULT_ROUTES: readonly RouteItem[] = [
+  {
+    routeId: 1,
+    routeNumber: 'R101',
+    name: 'North Amman Route',
+    startPoint: 'Abu Nseir',
+    destination: 'Basi School',
+    serviceArea: 'North Amman',
+    capacity: 30,
+    enrolledStudents: 18,
+    isActive: true,
+    stops: [
+      { stopId: 101, name: 'Abu Nseir Circle', stopOrder: 1, pickupTime: '6:45 AM', dropoffTime: '2:45 PM' },
+      { stopId: 102, name: 'Shafa Badran', stopOrder: 2, pickupTime: '7:00 AM', dropoffTime: '2:30 PM' },
+      { stopId: 103, name: 'University Street', stopOrder: 3, pickupTime: '7:15 AM', dropoffTime: '2:15 PM' },
+      { stopId: 104, name: 'Basi School', stopOrder: 4, pickupTime: '7:30 AM', dropoffTime: '2:00 PM' },
+    ],
+  },
+  {
+    routeId: 2,
+    routeNumber: 'R102',
+    name: 'West Amman Route',
+    startPoint: 'Khalda',
+    destination: 'Basi School',
+    serviceArea: 'West Amman',
+    capacity: 30,
+    enrolledStudents: 25,
+    isActive: true,
+    stops: [
+      { stopId: 201, name: 'Khalda Circle', stopOrder: 1, pickupTime: '6:50 AM', dropoffTime: '2:40 PM' },
+      { stopId: 202, name: 'Tla Al Ali', stopOrder: 2, pickupTime: '7:00 AM', dropoffTime: '2:30 PM' },
+      { stopId: 203, name: 'Dabouq', stopOrder: 3, pickupTime: '7:12 AM', dropoffTime: '2:18 PM' },
+      { stopId: 204, name: 'Basi School', stopOrder: 4, pickupTime: '7:30 AM', dropoffTime: '2:00 PM' },
+    ],
+  },
+  {
+    routeId: 3,
+    routeNumber: 'R103',
+    name: 'Downtown Route',
+    startPoint: 'Ras Al Ain',
+    destination: 'Basi School',
+    serviceArea: 'Downtown',
+    capacity: 30,
+    enrolledStudents: 22,
+    isActive: true,
+    stops: [
+      { stopId: 301, name: 'Ras Al Ain', stopOrder: 1, pickupTime: '6:40 AM', dropoffTime: '2:50 PM' },
+      { stopId: 302, name: 'Downtown Amman', stopOrder: 2, pickupTime: '6:50 AM', dropoffTime: '2:40 PM' },
+      { stopId: 303, name: 'Jabal Amman', stopOrder: 3, pickupTime: '7:05 AM', dropoffTime: '2:25 PM' },
+      { stopId: 304, name: 'Basi School', stopOrder: 4, pickupTime: '7:30 AM', dropoffTime: '2:00 PM' },
+    ],
+  },
+  {
+    routeId: 4,
+    routeNumber: 'R104',
+    name: 'East Amman Route',
+    startPoint: 'Marka',
+    destination: 'Basi School',
+    serviceArea: 'East Amman',
+    capacity: 30,
+    enrolledStudents: 30,
+    isActive: true,
+    stops: [
+      { stopId: 401, name: 'Marka', stopOrder: 1, pickupTime: '6:40 AM', dropoffTime: '2:45 PM' },
+      { stopId: 402, name: 'Tabarbour', stopOrder: 2, pickupTime: '6:55 AM', dropoffTime: '2:30 PM' },
+      { stopId: 403, name: 'Tareq', stopOrder: 3, pickupTime: '7:10 AM', dropoffTime: '2:15 PM' },
+      { stopId: 404, name: 'Basi School', stopOrder: 4, pickupTime: '7:30 AM', dropoffTime: '2:00 PM' },
+    ],
+  },
+];
+
 @Injectable({
   providedIn: 'root',
 })
 export class RouteService {
   private readonly http = inject(HttpClient);
 
-  private readonly routesSignal = signal<readonly RouteItem[]>([]);
+  private readonly routesSignal = signal<readonly RouteItem[]>(DEFAULT_ROUTES);
   public readonly routes = this.routesSignal.asReadonly();
 
   // Get all routes, with optional search and area filters
@@ -63,19 +133,24 @@ export class RouteService {
     return this.http.get<RouteStop[]>(`/api/stops/route/${routeId}`);
   }
 
-  // Load routes and save them in the shared signal
+  // Load routes and save them in the shared signal with safe fallback
   fetchRoutes(): Observable<readonly RouteItem[]> {
     return this.getRoutes().pipe(
       tap((routes) => {
-        this.routesSignal.set(routes);
-      })
+        if (routes && routes.length > 0) {
+          this.routesSignal.set(routes);
+        }
+      }),
+      catchError(() => of(this.routesSignal()))
     );
   }
 
-  // Find a route that has already been loaded
+  // Find a route by its ID
   findRouteById(routeId: number): RouteItem | undefined {
-    return this.routesSignal().find(
-      (route) => route.routeId === routeId
-    );
+    return this.routesSignal().find((route) => route.routeId === routeId);
+  }
+
+  getRouteById(routeId: number): RouteItem | undefined {
+    return this.findRouteById(routeId);
   }
 }
