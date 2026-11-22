@@ -3,6 +3,7 @@ import { NgOptimizedImage } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Header } from '../header/header';
 import { PreferencesService } from '../services/preferences.service';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-home',
@@ -12,7 +13,11 @@ import { PreferencesService } from '../services/preferences.service';
 })
 export class Home {
   protected readonly prefs = inject(PreferencesService);
+  protected readonly authService = inject(AuthService);
   protected readonly t = this.prefs.t;
+
+  public readonly isAuthenticated = computed(() => this.authService.isAuthenticated());
+  public readonly isAdmin = computed(() => this.authService.userRole() === 'Admin');
 
   protected readonly serviceList = computed(() => this.t().serviceList);
   protected readonly infoCards = computed(() => this.t().infoCards);

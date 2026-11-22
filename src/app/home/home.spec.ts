@@ -1,13 +1,29 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Home } from './home';
+import { AuthService } from '../services/auth.service';
 
 describe('Home', () => {
+  let authService: AuthService;
+
   beforeEach(async () => {
+    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [Home],
-      providers: [provideRouter([])],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     }).compileComponents();
+
+    authService = TestBed.inject(AuthService);
+  });
+
+  afterEach(() => {
+    localStorage.clear();
   });
 
   it('should create the Home component', () => {
@@ -38,5 +54,21 @@ describe('Home', () => {
     expect(serviceCards.length).toBe(3);
     expect(infoCards.length).toBe(3);
   });
-});
 
+  it('should adjust hero action buttons when user is authenticated', async () => {
+    authService.setSession({
+      token: 'mock.token',
+      role: 'Parent',
+      fullName: 'Test Parent',
+      email: 'parent@stms.edu',
+    });
+
+    const fixture = TestBed.createComponent(Home);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.textContent).not.toContain('Register Now');
+    expect(compiled.textContent).toContain('Request Subscription');
+  });
+});

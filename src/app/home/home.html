@@ -20,12 +20,25 @@
           <a routerLink="/routes" class="btn btn-outline btn-lg">
             {{ t().navRoutesSafety }}
           </a>
-          <a routerLink="/register" class="btn btn-secondary btn-lg">
-            {{ t().heroRegisterNow }}
-          </a>
-          <a routerLink="/login" class="btn btn-outline btn-lg">
-            {{ t().heroLogin }}
-          </a>
+          @if (!isAuthenticated()) {
+            <a routerLink="/register" class="btn btn-secondary btn-lg">
+              {{ t().heroRegisterNow }}
+            </a>
+            <a routerLink="/login" class="btn btn-outline btn-lg">
+              {{ t().heroLogin }}
+            </a>
+          } @else if (isAdmin()) {
+            <a routerLink="/admin-dashboard" class="btn btn-secondary btn-lg">
+              {{ prefs.lang() === 'ar' ? 'لوحة تحكم المسؤول' : 'Admin Dashboard' }}
+            </a>
+          } @else {
+            <a routerLink="/subscription" class="btn btn-secondary btn-lg">
+              {{ prefs.lang() === 'ar' ? 'طلب اشتراك' : 'Request Subscription' }}
+            </a>
+            <a routerLink="/my-transportation" class="btn btn-outline btn-lg">
+              {{ prefs.lang() === 'ar' ? 'تفاصيل النقل' : 'My Transportation' }}
+            </a>
+          }
         </div>
       </div>
     </section>
@@ -96,18 +109,20 @@
     </section>
 
     <!-- Registration Call To Action -->
-    <section id="register-cta" class="cta-section" aria-labelledby="cta-title">
-      <div class="cta-container">
-        <h2 id="cta-title" class="cta-title">{{ t().ctaTitle }}</h2>
-        <p class="cta-description">
-          {{ t().ctaDesc }}
-        </p>
-        <div class="cta-actions">
-          <a routerLink="/register" class="btn btn-dark btn-lg">{{ t().ctaRegisterBtn }}</a>
-          <a routerLink="/login" class="btn btn-outline-white btn-lg">{{ t().ctaLoginBtn }}</a>
+    @if (!isAuthenticated()) {
+      <section id="register-cta" class="cta-section" aria-labelledby="cta-title">
+        <div class="cta-container">
+          <h2 id="cta-title" class="cta-title">{{ t().ctaTitle }}</h2>
+          <p class="cta-description">
+            {{ t().ctaDesc }}
+          </p>
+          <div class="cta-actions">
+            <a routerLink="/register" class="btn btn-dark btn-lg">{{ t().ctaRegisterBtn }}</a>
+            <a routerLink="/login" class="btn btn-outline-white btn-lg">{{ t().ctaLoginBtn }}</a>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    }
 
     <!-- Office & Contact Details -->
     <section id="office" class="section office-section" aria-labelledby="office-title">
