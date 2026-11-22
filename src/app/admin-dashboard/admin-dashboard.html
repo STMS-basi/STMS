@@ -213,6 +213,10 @@
                         <button type="button" class="btn-sm btn-danger" (click)="rejectSubscription(req.subscriptionId)">
                           {{ translate('Reject') }}
                         </button>
+                      } @else if (req.status === 'AwaitingPayment') {
+                        <button type="button" class="btn-sm btn-success" (click)="activeTab.set('payments')">
+                          {{ translate('Mark as Paid') }}
+                        </button>
                       } @else {
                         <span class="text-muted">{{ translate(req.status) }}</span>
                       }
@@ -754,6 +758,14 @@
             <button
               type="button"
               class="pill-btn"
+              [class.active]="subscriptionFilter() === 'AwaitingPayment'"
+              (click)="subscriptionFilter.set('AwaitingPayment')"
+            >
+              {{ translate('AwaitingPayment') }}
+            </button>
+            <button
+              type="button"
+              class="pill-btn"
               [class.active]="subscriptionFilter() === 'Approved'"
               (click)="subscriptionFilter.set('Approved')"
             >
@@ -809,14 +821,12 @@
                         <button type="button" class="btn-sm btn-danger" (click)="rejectSubscription(sub.subscriptionId)">
                           {{ translate('Reject') }}
                         </button>
-                      } @else if (sub.status === 'Approved') {
-                        <button type="button" class="btn-sm btn-danger" (click)="rejectSubscription(sub.subscriptionId)">
-                          {{ translate('Reject') }}
+                      } @else if (sub.status === 'AwaitingPayment') {
+                        <button type="button" class="btn-sm btn-success" (click)="activeTab.set('payments')">
+                          {{ translate('Mark as Paid') }}
                         </button>
                       } @else {
-                        <button type="button" class="btn-sm btn-success" (click)="approveSubscription(sub.subscriptionId)">
-                          {{ translate('Approve') }}
-                        </button>
+                        <span class="text-muted">{{ translate(sub.status) }}</span>
                       }
                     </div>
                   </td>

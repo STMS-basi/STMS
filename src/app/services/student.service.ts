@@ -1,5 +1,6 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, of } from 'rxjs';
+import { Observable, catchError, of, tap } from 'rxjs';
 import { AuthService } from './auth.service';
 
 export interface StudentItem {
@@ -48,6 +49,7 @@ const INITIAL_DEMO_STUDENTS: readonly StudentItem[] = [
   providedIn: 'root',
 })
 export class StudentService {
+  private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
 
   private readonly studentsSignal = signal<StudentItem[]>(this.loadStoredStudents());
@@ -95,7 +97,16 @@ export class StudentService {
   public fetchStudents(): Observable<StudentItem[]> {
     const currentLocal = this.loadStoredStudents();
     this.studentsSignal.set(currentLocal);
-    return of(currentLocal);
+
+    return this.http.get<StudentItem[]>('/api/students').pipe(
+      tap((students) => {
+        if (Array.isArray(students) && students.length > 0) {
+          this.studentsSignal.set(students);
+          this.persistStoredStudents(students);
+        }
+      }),
+      catchError(() => of(currentLocal))
+    );
   }
 
   public addStudent(payload: CreateStudentPayload): Observable<{ success: boolean; studentId: number }> {
@@ -113,13 +124,24 @@ export class StudentService {
     this.studentsSignal.set(updated);
     this.persistStoredStudents(updated);
 
+    // Dispatch HTTP POST to backend API
+    this.http
+      .post<{ message?: string; studentId: number }>('/api/students', {
+        fullName: payload.fullName.trim(),
+        grade: payload.grade.trim(),
+        className: payload.className.trim(),
+        dateOfBirth: payload.dateOfBirth || null,
+        notes: payload.notes?.trim() || null,
+      })
+      .pipe(catchError(() => of(null)))
+      .subscribe();
+
     return of({ success: true, studentId: localId });
   }
 
   public updateStudent(id: number, payload: CreateStudentPayload): Observable<{ success: boolean }> {
     const current = this.studentsSignal().find((s) => s.studentId === id);
     if (!current || (current.parentEmail && current.parentEmail !== this.getParentEmail())) {
-      // Prevent modifying students registered under another parent account
       return of({ success: false });
     }
 
@@ -138,19 +160,36 @@ export class StudentService {
     this.studentsSignal.set(updated);
     this.persistStoredStudents(updated);
 
+    // Dispatch HTTP PUT to backend API
+    this.http
+      .put(`/api/students/${id}`, {
+        fullName: payload.fullName.trim(),
+        grade: payload.grade.trim(),
+        className: payload.className.trim(),
+        dateOfBirth: payload.dateOfBirth || null,
+        notes: payload.notes?.trim() || null,
+      })
+      .pipe(catchError(() => of(null)))
+      .subscribe();
+
     return of({ success: true });
   }
 
   public deleteStudent(id: number): Observable<{ success: boolean }> {
     const current = this.studentsSignal().find((s) => s.studentId === id);
     if (!current || (current.parentEmail && current.parentEmail !== this.getParentEmail())) {
-      // Prevent deleting students registered under another parent account
       return of({ success: false });
     }
 
     const updated = this.studentsSignal().filter((s) => s.studentId !== id);
     this.studentsSignal.set(updated);
     this.persistStoredStudents(updated);
+
+    // Dispatch HTTP DELETE to backend API
+    this.http
+      .delete(`/api/students/${id}`)
+      .pipe(catchError(() => of(null)))
+      .subscribe();
 
     return of({ success: true });
   }

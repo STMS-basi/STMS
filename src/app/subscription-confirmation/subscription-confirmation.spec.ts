@@ -55,7 +55,7 @@ describe('SubscriptionConfirmation', () => {
       pickupTime: '6:45 AM',
       dropoffTime: '2:45 PM',
       transportType: 'RoundTrip',
-      fee: 40,
+      fee: 300,
     });
 
     const created = subscriptionService.subscriptions()[0];
@@ -65,7 +65,7 @@ describe('SubscriptionConfirmation', () => {
 
     expect(component.subscription()).toBeDefined();
     expect(component.subscription()?.studentName).toBe('Zaid Student');
-    expect(component.subscription()?.fee).toBe(40);
+    expect(component.subscription()?.fee).toBe(300);
     expect(component.subscription()?.status).toBe('Pending');
   });
 

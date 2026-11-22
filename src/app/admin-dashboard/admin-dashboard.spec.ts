@@ -44,13 +44,14 @@ describe('AdminDashboard', () => {
   });
 
   it('should approve and reject subscription requests', () => {
-    const sub = adminService.subscriptions()[0];
+    const sub = adminService.subscriptions().find(s => s.status === 'Pending')!;
     component.approveSubscription(sub.subscriptionId);
     let updated = adminService.subscriptions().find(s => s.subscriptionId === sub.subscriptionId);
-    expect(updated?.status).toBe('Approved');
+    expect(updated?.status).toBe('AwaitingPayment');
 
-    component.rejectSubscription(sub.subscriptionId);
-    updated = adminService.subscriptions().find(s => s.subscriptionId === sub.subscriptionId);
+    const anotherPending = adminService.subscriptions().find(s => s.status === 'Pending')!;
+    component.rejectSubscription(anotherPending.subscriptionId);
+    updated = adminService.subscriptions().find(s => s.subscriptionId === anotherPending.subscriptionId);
     expect(updated?.status).toBe('Rejected');
   });
 

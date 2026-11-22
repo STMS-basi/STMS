@@ -37,7 +37,7 @@ export class AdminDashboard {
 
   public readonly studentSearch = signal('');
   public readonly parentSearch = signal('');
-  public readonly subscriptionFilter = signal<'All' | 'Pending' | 'Approved' | 'Rejected'>('All');
+  public readonly subscriptionFilter = signal<'All' | 'Pending' | 'AwaitingPayment' | 'Approved' | 'Rejected'>('All');
   public readonly paymentFilter = signal<'All' | 'Paid' | 'Partial' | 'Unpaid'>('All');
 
   public readonly showAddRoute = signal(false);
@@ -245,6 +245,7 @@ export class AdminDashboard {
     'Subscription Status': 'حالة الاشتراكات',
     'Active': 'نشط',
     'Pending': 'قيد الانتظار',
+    'AwaitingPayment': 'بانتظار سداد الرسوم',
     'Approved': 'تمت الموافقة',
     'Rejected': 'مرفوض',
     'Cancelled': 'ملغي',
@@ -447,6 +448,7 @@ export class AdminDashboard {
         return 'status-approved';
       case 'Pending':
       case 'Partial':
+      case 'AwaitingPayment':
         return 'status-pending';
       case 'Rejected':
       case 'Cancelled':

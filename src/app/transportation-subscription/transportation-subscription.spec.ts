@@ -48,10 +48,10 @@ describe('TransportationSubscription', () => {
     const component = fixture.componentInstance;
 
     component.selectTransportType('RoundTrip');
-    expect(component.calculatedFee()).toBe(40);
+    expect(component.calculatedFee()).toBe(300);
 
     component.selectTransportType('OneWay');
-    expect(component.calculatedFee()).toBe(25);
+    expect(component.calculatedFee()).toBe(150);
   });
 
   it('should validate capacity and identify when route has available seats or is full', () => {

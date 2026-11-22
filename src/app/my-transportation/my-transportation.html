@@ -135,8 +135,8 @@
                     <span
                       class="status-badge"
                       [class.status-approved]="sub.status === 'Approved'"
-                      [class.status-pending]="sub.status === 'Pending'"
-                      [class.status-rejected]="sub.status === 'Rejected' || sub.status === 'Cancelled'"
+                      [class.status-pending]="sub.status === 'Pending' || sub.status === 'AwaitingPayment'"
+                      [class.status-rejected]="sub.status === 'Rejected'"
                     >
                       {{ statusText(sub.status) }}
                     </span>
@@ -213,7 +213,7 @@
                         {{ prefs.lang() === 'ar' ? 'عرض التفاصيل' : 'View Details' }}
                       </button>
 
-                      @if (sub.status !== 'Cancelled' && sub.status !== 'Rejected') {
+                      @if (sub.status !== 'Rejected') {
                         <button
                           type="button"
                           class="btn btn-secondary"

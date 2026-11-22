@@ -26,13 +26,14 @@ describe('AdminService', () => {
   });
 
   it('should allow approving and rejecting subscriptions', () => {
-    const sub = service.subscriptions()[0];
+    const sub = service.subscriptions().find(s => s.status === 'Pending')!;
     service.approveSubscription(sub.subscriptionId);
     let updated = service.subscriptions().find(s => s.subscriptionId === sub.subscriptionId);
-    expect(updated?.status).toBe('Approved');
+    expect(updated?.status).toBe('AwaitingPayment');
 
-    service.rejectSubscription(sub.subscriptionId);
-    updated = service.subscriptions().find(s => s.subscriptionId === sub.subscriptionId);
+    const anotherPending = service.subscriptions().find(s => s.status === 'Pending')!;
+    service.rejectSubscription(anotherPending.subscriptionId);
+    updated = service.subscriptions().find(s => s.subscriptionId === anotherPending.subscriptionId);
     expect(updated?.status).toBe('Rejected');
   });
 

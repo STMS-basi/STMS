@@ -198,6 +198,7 @@ export class MyTransportation {
       switch (status) {
         case 'Approved': return 'تمت الموافقة';
         case 'Pending': return 'قيد الانتظار';
+        case 'AwaitingPayment': return 'بانتظار سداد الرسوم';
         case 'Rejected': return 'مرفوض';
         case 'Cancelled': return 'ملغي';
         default: return status;
@@ -207,6 +208,7 @@ export class MyTransportation {
     switch (status) {
       case 'Approved': return 'Approved';
       case 'Pending': return 'Pending Approval';
+      case 'AwaitingPayment': return 'Awaiting Payment';
       case 'Rejected': return 'Rejected';
       case 'Cancelled': return 'Cancelled';
       default: return status;

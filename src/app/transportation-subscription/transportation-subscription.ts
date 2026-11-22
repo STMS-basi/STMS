@@ -73,7 +73,7 @@ export class TransportationSubscription implements OnInit {
   });
 
   public readonly calculatedFee = computed<number>(() => {
-    return this.selectedTransportType() === 'OneWay' ? 25 : 40;
+    return this.selectedTransportType() === 'OneWay' ? 150 : 300;
   });
 
   public ngOnInit(): void {

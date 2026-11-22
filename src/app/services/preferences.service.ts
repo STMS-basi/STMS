@@ -174,6 +174,7 @@ export interface AppTranslations {
   readonly refNumberLabel: string;
   readonly statusLabel: string;
   readonly statusPending: string;
+  readonly statusAwaitingPayment: string;
   readonly studentDetailsHeader: string;
   readonly routeDetailsHeader: string;
   readonly feeDetailsHeader: string;
@@ -390,9 +391,9 @@ const EN_TRANSLATIONS: AppTranslations = {
   typeOneWay: 'One Way',
   typeOneWayDesc: 'Morning pickup or afternoon drop off only',
   subFeeSummary: 'Subscription Fee Summary',
-  monthlyFeeLabel: 'Monthly Fee',
-  currencyJOD: 'JOD per month',
-  subConditionsNotice: 'Subscription is valid for the current school term. Requests are reviewed by the school transport office.',
+  monthlyFeeLabel: 'Semester Fee',
+  currencyJOD: 'JOD per semester',
+  subConditionsNotice: 'Subscription is valid for the current semester. Requests are reviewed by the school transport office, and final activation is confirmed upon fee settlement.',
   submitSubscriptionBtn: 'Submit Subscription Request',
   submittingSubscriptionBtn: 'Submitting Request...',
 
@@ -401,6 +402,7 @@ const EN_TRANSLATIONS: AppTranslations = {
   refNumberLabel: 'Reference Number',
   statusLabel: 'Request Status',
   statusPending: 'Pending Approval',
+  statusAwaitingPayment: 'Awaiting Payment',
   studentDetailsHeader: 'Student Details',
   routeDetailsHeader: 'Route and Schedule',
   feeDetailsHeader: 'Fee and Billing',
@@ -617,9 +619,9 @@ const AR_TRANSLATIONS: AppTranslations = {
   typeOneWay: 'اتجاه واحد',
   typeOneWayDesc: 'اصطحاب صباحي فقط أو توصيل بعد الظهر فقط',
   subFeeSummary: 'ملخص رسوم الاشتراك',
-  monthlyFeeLabel: 'الرسوم الشهرية',
-  currencyJOD: 'دينار أردني شهرياً',
-  subConditionsNotice: 'الاشتراك معتمد للفصل الدراسي الحالي. تخضع جميع الطلبات لمراجعة واعتماد مكتب النقل.',
+  monthlyFeeLabel: 'رسوم الفصل الدراسي',
+  currencyJOD: 'دينار أردني للفصل',
+  subConditionsNotice: 'الاشتراك معتمد للفصل الدراسي المحدد. تخضع جميع الطلبات لمراجعة واعتماد مكتب النقل، ويتم التفعيل النهائي بعد سداد الرسوم.',
   submitSubscriptionBtn: 'إرسال طلب الاشتراك',
   submittingSubscriptionBtn: 'جاري إرسال الطلب...',
 
@@ -628,6 +630,7 @@ const AR_TRANSLATIONS: AppTranslations = {
   refNumberLabel: 'رقم المرجع',
   statusLabel: 'حالة الطلب',
   statusPending: 'قيد المراجعة',
+  statusAwaitingPayment: 'بانتظار سداد الرسوم',
   studentDetailsHeader: 'بيانات الطالب',
   routeDetailsHeader: 'المسار والجدول الزمني',
   feeDetailsHeader: 'الرسوم والدفع',

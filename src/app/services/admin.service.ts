@@ -74,7 +74,7 @@ export interface AdminSubscriptionItem {
   readonly stopName: string;
   readonly transportType: 'OneWay' | 'RoundTrip';
   readonly fee: number;
-  readonly status: 'Pending' | 'Approved' | 'Rejected' | 'Cancelled';
+  readonly status: 'Pending' | 'AwaitingPayment' | 'Approved' | 'Rejected';
   readonly requestedAt: string;
 }
 
@@ -199,20 +199,20 @@ const INITIAL_STUDENTS: AdminStudentItem[] = [
 ];
 
 const INITIAL_SUBSCRIPTIONS: AdminSubscriptionItem[] = [
-  { subscriptionId: 1001, referenceNumber: 'SUB 2026 84920', studentName: 'Yousef Al Basi', parentName: 'Ahmad Guardian', routeNumber: 'R101', routeName: 'North Amman Route', stopName: 'Abu Nseir Circle', transportType: 'RoundTrip', fee: 40, status: 'Approved', requestedAt: '2026-11-18' },
-  { subscriptionId: 1002, referenceNumber: 'SUB 2026 51293', studentName: 'Layan Al Basi', parentName: 'Ahmad Guardian', routeNumber: 'R101', routeName: 'North Amman Route', stopName: 'Abu Nseir Circle', transportType: 'RoundTrip', fee: 40, status: 'Approved', requestedAt: '2026-11-18' },
-  { subscriptionId: 1003, referenceNumber: 'SUB 2026 19384', studentName: 'Kareem Faris', parentName: 'Faris Al Basi', routeNumber: 'R102', routeName: 'West Amman Route', stopName: 'Khalda Circle', transportType: 'RoundTrip', fee: 40, status: 'Approved', requestedAt: '2026-11-17' },
-  { subscriptionId: 1004, referenceNumber: 'SUB 2026 73819', studentName: 'Salma Zaid', parentName: 'Zaid Guardian', routeNumber: 'R101', routeName: 'North Amman Route', stopName: 'Shafa Badran', transportType: 'OneWay', fee: 25, status: 'Pending', requestedAt: '2026-11-19' },
-  { subscriptionId: 1005, referenceNumber: 'SUB 2026 40291', studentName: 'Hamza Samer', parentName: 'Samer Guardian', routeNumber: 'R103', routeName: 'Downtown Route', stopName: 'Ras Al Ain', transportType: 'RoundTrip', fee: 40, status: 'Pending', requestedAt: '2026-11-19' },
-  { subscriptionId: 1006, referenceNumber: 'SUB 2026 62910', studentName: 'Maya Ahmad', parentName: 'Samer Guardian', routeNumber: 'R104', routeName: 'East Amman Route', stopName: 'Marka Center', transportType: 'RoundTrip', fee: 40, status: 'Rejected', requestedAt: '2026-11-15' },
+  { subscriptionId: 1001, referenceNumber: 'SUB 2026 84920', studentName: 'Yousef Al Basi', parentName: 'Ahmad Guardian', routeNumber: 'R101', routeName: 'North Amman Route', stopName: 'Abu Nseir Circle', transportType: 'RoundTrip', fee: 300, status: 'Approved', requestedAt: '2026-11-18' },
+  { subscriptionId: 1002, referenceNumber: 'SUB 2026 51293', studentName: 'Layan Al Basi', parentName: 'Ahmad Guardian', routeNumber: 'R101', routeName: 'North Amman Route', stopName: 'Abu Nseir Circle', transportType: 'RoundTrip', fee: 300, status: 'Approved', requestedAt: '2026-11-18' },
+  { subscriptionId: 1003, referenceNumber: 'SUB 2026 19384', studentName: 'Kareem Faris', parentName: 'Faris Al Basi', routeNumber: 'R102', routeName: 'West Amman Route', stopName: 'Khalda Circle', transportType: 'RoundTrip', fee: 300, status: 'AwaitingPayment', requestedAt: '2026-11-17' },
+  { subscriptionId: 1004, referenceNumber: 'SUB 2026 73819', studentName: 'Salma Zaid', parentName: 'Zaid Guardian', routeNumber: 'R101', routeName: 'North Amman Route', stopName: 'Shafa Badran', transportType: 'OneWay', fee: 150, status: 'Pending', requestedAt: '2026-11-19' },
+  { subscriptionId: 1005, referenceNumber: 'SUB 2026 40291', studentName: 'Hamza Samer', parentName: 'Samer Guardian', routeNumber: 'R103', routeName: 'Downtown Route', stopName: 'Ras Al Ain', transportType: 'RoundTrip', fee: 300, status: 'Pending', requestedAt: '2026-11-19' },
+  { subscriptionId: 1006, referenceNumber: 'SUB 2026 62910', studentName: 'Maya Ahmad', parentName: 'Samer Guardian', routeNumber: 'R104', routeName: 'East Amman Route', stopName: 'Marka Center', transportType: 'RoundTrip', fee: 300, status: 'Rejected', requestedAt: '2026-11-15' },
 ];
 
 const INITIAL_PAYMENTS: AdminPaymentItem[] = [
-  { paymentId: 501, referenceNumber: 'SUB 2026 84920', studentName: 'Yousef Al Basi', parentName: 'Ahmad Guardian', amountDue: 40, amountPaid: 40, status: 'Paid', paymentDate: '2026-11-18', recordedBy: 'Admin Office' },
-  { paymentId: 502, referenceNumber: 'SUB 2026 51293', studentName: 'Layan Al Basi', parentName: 'Ahmad Guardian', amountDue: 40, amountPaid: 40, status: 'Paid', paymentDate: '2026-11-18', recordedBy: 'Admin Office' },
-  { paymentId: 503, referenceNumber: 'SUB 2026 19384', studentName: 'Kareem Faris', parentName: 'Faris Al Basi', amountDue: 40, amountPaid: 20, status: 'Partial', paymentDate: '2026-11-17', recordedBy: 'Finance Desk' },
-  { paymentId: 504, referenceNumber: 'SUB 2026 73819', studentName: 'Salma Zaid', parentName: 'Zaid Guardian', amountDue: 25, amountPaid: 0, status: 'Unpaid', paymentDate: '2026-11-19', recordedBy: 'Pending Payment' },
-  { paymentId: 505, referenceNumber: 'SUB 2026 40291', studentName: 'Hamza Samer', parentName: 'Samer Guardian', amountDue: 40, amountPaid: 0, status: 'Unpaid', paymentDate: '2026-11-19', recordedBy: 'Pending Payment' },
+  { paymentId: 501, referenceNumber: 'SUB 2026 84920', studentName: 'Yousef Al Basi', parentName: 'Ahmad Guardian', amountDue: 300, amountPaid: 300, status: 'Paid', paymentDate: '2026-11-18', recordedBy: 'Admin Office' },
+  { paymentId: 502, referenceNumber: 'SUB 2026 51293', studentName: 'Layan Al Basi', parentName: 'Ahmad Guardian', amountDue: 300, amountPaid: 300, status: 'Paid', paymentDate: '2026-11-18', recordedBy: 'Admin Office' },
+  { paymentId: 503, referenceNumber: 'SUB 2026 19384', studentName: 'Kareem Faris', parentName: 'Faris Al Basi', amountDue: 300, amountPaid: 0, status: 'Unpaid', paymentDate: '2026-11-17', recordedBy: 'Finance Desk' },
+  { paymentId: 504, referenceNumber: 'SUB 2026 73819', studentName: 'Salma Zaid', parentName: 'Zaid Guardian', amountDue: 150, amountPaid: 0, status: 'Unpaid', paymentDate: '2026-11-19', recordedBy: 'Pending Payment' },
+  { paymentId: 505, referenceNumber: 'SUB 2026 40291', studentName: 'Hamza Samer', parentName: 'Samer Guardian', amountDue: 300, amountPaid: 0, status: 'Unpaid', paymentDate: '2026-11-19', recordedBy: 'Pending Payment' },
 ];
 
 @Injectable({
@@ -326,22 +326,31 @@ export class AdminService {
   }
 
   public approveSubscription(subscriptionId: number): void {
-    this.updateSubscriptionStatus(subscriptionId, 'Approved');
+    // Preliminary approval moves status to AwaitingPayment
+    this.updateSubscriptionStatus(subscriptionId, 'AwaitingPayment');
   }
 
   public rejectSubscription(subscriptionId: number): void {
-    this.updateSubscriptionStatus(subscriptionId, 'Rejected');
+    const sub = this.subscriptionsSignal().find(s => s.subscriptionId === subscriptionId);
+    if (!sub || sub.status === 'Pending') {
+      this.updateSubscriptionStatus(subscriptionId, 'Rejected');
+    }
   }
 
-  public updateSubscriptionStatus(subscriptionId: number, status: 'Pending' | 'Approved' | 'Rejected' | 'Cancelled'): void {
+  public updateSubscriptionStatus(
+    subscriptionId: number,
+    status: 'Pending' | 'AwaitingPayment' | 'Approved' | 'Rejected'
+  ): void {
     const updated = this.subscriptionsSignal().map(s => s.subscriptionId === subscriptionId ? { ...s, status } : s);
     this.subscriptionsSignal.set(updated);
     this.saveStorage(STORAGE_KEYS.SUBSCRIPTIONS, updated);
   }
 
   public updatePaymentStatus(paymentId: number, status: 'Unpaid' | 'Partial' | 'Paid', amountPaid?: number): void {
+    let targetRef = '';
     const updated = this.paymentsSignal().map(p => {
       if (p.paymentId === paymentId) {
+        targetRef = p.referenceNumber;
         const newPaid = amountPaid !== undefined ? amountPaid : (status === 'Paid' ? p.amountDue : (status === 'Unpaid' ? 0 : p.amountPaid));
         return {
           ...p,
@@ -355,5 +364,14 @@ export class AdminService {
     });
     this.paymentsSignal.set(updated);
     this.saveStorage(STORAGE_KEYS.PAYMENTS, updated);
+
+    // Full payment confirmation automatically approves the subscription
+    if (status === 'Paid' && targetRef) {
+      const updatedSubs = this.subscriptionsSignal().map(s =>
+        s.referenceNumber === targetRef ? { ...s, status: 'Approved' as const } : s
+      );
+      this.subscriptionsSignal.set(updatedSubs);
+      this.saveStorage(STORAGE_KEYS.SUBSCRIPTIONS, updatedSubs);
+    }
   }
 }

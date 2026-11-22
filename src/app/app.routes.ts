@@ -1,5 +1,6 @@
-
 import { Routes } from '@angular/router';
+import { adminGuard } from './guards/admin.guard';
+import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   {
@@ -32,6 +33,7 @@ export const routes: Routes = [
   },
   {
     path: 'students',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./students/student-registration/student-registration').then(
         (m) => m.StudentRegistration
@@ -44,6 +46,7 @@ export const routes: Routes = [
   },
   {
     path: 'subscription',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./transportation-subscription/transportation-subscription').then(
         (m) => m.TransportationSubscription
@@ -51,6 +54,7 @@ export const routes: Routes = [
   },
   {
     path: 'subscription-confirmation/:reference',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./subscription-confirmation/subscription-confirmation').then(
         (m) => m.SubscriptionConfirmation
@@ -58,6 +62,7 @@ export const routes: Routes = [
   },
   {
     path: 'subscription-confirmation',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./subscription-confirmation/subscription-confirmation').then(
         (m) => m.SubscriptionConfirmation
@@ -65,18 +70,21 @@ export const routes: Routes = [
   },
   {
     path: 'my-transportation',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./my-transportation/my-transportation').then((m) => m.MyTransportation),
   },
   {
     path: 'payment-status',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./payment-status/payment-status').then((m) => m.PaymentStatus),
   },
 
-  // Admin Dashboard
+  // Admin Dashboard protected by adminGuard
   {
     path: 'admin-dashboard',
+    canActivate: [adminGuard],
     loadComponent: () =>
       import('./admin-dashboard/admin-dashboard').then(
         (m) => m.AdminDashboard

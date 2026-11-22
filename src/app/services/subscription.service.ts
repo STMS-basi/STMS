@@ -1,9 +1,10 @@
-
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
+import { Observable, catchError, of, tap } from 'rxjs';
 import { AuthService } from './auth.service';
 
 export type TransportType = 'OneWay' | 'RoundTrip';
-export type SubscriptionStatus = 'Pending' | 'Approved' | 'Rejected' | 'Cancelled';
+export type SubscriptionStatus = 'Pending' | 'AwaitingPayment' | 'Approved' | 'Rejected';
 
 export interface SubscriptionItem {
   readonly subscriptionId: number;
@@ -44,12 +45,30 @@ export interface CreateSubscriptionPayload {
   readonly endDate?: string;
 }
 
+export interface BackendSubscriptionResponse {
+  readonly subscriptionId: number;
+  readonly referenceNumber: string;
+  readonly fee?: number;
+  readonly status?: SubscriptionStatus;
+  readonly startDate?: string;
+  readonly endDate?: string;
+}
+
+export interface RegistrationInfo {
+  readonly semesterName: string;
+  readonly startDate: string;
+  readonly endDate: string;
+  readonly registrationOpenDate: string;
+  readonly isRegistrationOpen: boolean;
+}
+
 const STORAGE_SUBSCRIPTIONS_KEY = 'stms_subscriptions';
 
 @Injectable({
   providedIn: 'root',
 })
 export class SubscriptionService {
+  private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
 
   private readonly subscriptionsSignal = signal<SubscriptionItem[]>(
@@ -92,19 +111,38 @@ export class SubscriptionService {
     return `SUB 2026 ${randomDigits}`;
   }
 
+  public fetchSubscriptions(): Observable<SubscriptionItem[]> {
+    return this.http.get<SubscriptionItem[]>('/api/subscriptions').pipe(
+      tap((items) => {
+        if (Array.isArray(items) && items.length > 0) {
+          this.subscriptionsSignal.set(items);
+          this.persist(items);
+        }
+      }),
+      catchError(() => of(this.subscriptionsSignal()))
+    );
+  }
+
+  public getRegistrationInfo(): Observable<RegistrationInfo> {
+    return this.http.get<RegistrationInfo>('/api/subscriptions/registration-info').pipe(
+      catchError(() =>
+        of({
+          semesterName: 'Second Semester 2026/2027',
+          startDate: '2027-01-15',
+          endDate: '2027-05-31',
+          registrationOpenDate: '2027-01-01',
+          isRegistrationOpen: true,
+        })
+      )
+    );
+  }
+
   public createSubscription(
     payload: CreateSubscriptionPayload
   ): SubscriptionItem {
     const id = Date.now();
     const referenceNumber = this.generateReferenceNumber();
     const requestedAt = new Date().toISOString();
-
-    const today = new Date();
-    const termEnd = new Date(
-      today.getFullYear(),
-      today.getMonth() + 4,
-      1
-    );
 
     const newSub: SubscriptionItem = {
       subscriptionId: id,
@@ -122,21 +160,48 @@ export class SubscriptionService {
       transportType: payload.transportType,
       fee: payload.fee,
       status: 'Pending',
-      startDate:
-        payload.startDate ?? today.toISOString().split('T')[0],
-      endDate:
-        payload.endDate ?? termEnd.toISOString().split('T')[0],
+      startDate: payload.startDate ?? '2027-01-15',
+      endDate: payload.endDate ?? '2027-05-31',
       requestedAt,
       parentEmail: this.authService.userEmail()?.toLowerCase() ?? '',
     };
 
-    const updated = [
-      newSub,
-      ...this.subscriptionsSignal(),
-    ];
-
+    const updated = [newSub, ...this.subscriptionsSignal()];
     this.subscriptionsSignal.set(updated);
     this.persist(updated);
+
+    // Dispatch real HTTP POST to /api/subscriptions
+    const requestBody = {
+      studentId: payload.studentId,
+      routeId: payload.routeId,
+      stopId: payload.stopId,
+      transportType: payload.transportType,
+    };
+
+    this.http
+      .post<BackendSubscriptionResponse>('/api/subscriptions', requestBody)
+      .pipe(
+        tap((res) => {
+          if (res && res.referenceNumber) {
+            const synced = this.subscriptionsSignal().map((s) =>
+              s.subscriptionId === id
+                ? {
+                    ...s,
+                    subscriptionId: res.subscriptionId ?? s.subscriptionId,
+                    referenceNumber: res.referenceNumber,
+                    fee: res.fee ?? s.fee,
+                    startDate: res.startDate ?? s.startDate,
+                    endDate: res.endDate ?? s.endDate,
+                  }
+                : s
+            );
+            this.subscriptionsSignal.set(synced);
+            this.persist(synced);
+          }
+        }),
+        catchError(() => of(null))
+      )
+      .subscribe();
 
     return newSub;
   }
