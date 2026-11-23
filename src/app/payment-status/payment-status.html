@@ -145,8 +145,13 @@
                       </strong>
                     </div>
 
-                    <span class="payment-status">
-                      {{ paymentStatusText() }}
+                    <span
+                      class="payment-status"
+                      [class.status-paid]="payment.paymentStatus === 'Paid'"
+                      [class.status-unpaid]="payment.paymentStatus === 'Unpaid'"
+                      [class.status-pending]="payment.paymentStatus === 'Pending Approval'"
+                    >
+                      {{ paymentStatusText(payment) }}
                     </span>
                   </div>
 
@@ -306,8 +311,14 @@
 
                   <p>
                     <strong>{{ prefs.lang() === 'ar' ? 'حالة الدفع:' : 'Payment Status:' }}</strong>
-                    {{ paymentStatusText() }}
+                    {{ paymentStatusText(payment) }}
                   </p>
+                  @if (payment.paymentDate) {
+                    <p>
+                      <strong>{{ prefs.lang() === 'ar' ? 'تاريخ الدفع:' : 'Payment Date:' }}</strong>
+                      {{ payment.paymentDate | date:'mediumDate' }}
+                    </p>
+                  }
 
                   <div class="modal-notice">
                     {{ prefs.lang() === 'ar'
