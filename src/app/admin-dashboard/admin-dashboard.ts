@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Header } from '../header/header';
@@ -6,9 +6,11 @@ import { PreferencesService } from '../services/preferences.service';
 import {
   AdminBusItem,
   AdminDriverItem,
+  AdminPaymentItem,
   AdminRouteItem,
   AdminService,
   AdminStopItem,
+  AdminSubscriptionItem,
 } from '../services/admin.service';
 
 export type AdminTab =
@@ -28,10 +30,25 @@ export type AdminTab =
   templateUrl: './admin-dashboard.html',
   styleUrl: './admin-dashboard.css',
 })
-export class AdminDashboard {
+export class AdminDashboard implements OnInit {
   protected readonly prefs = inject(PreferencesService);
   protected readonly adminService = inject(AdminService);
   private readonly fb = inject(NonNullableFormBuilder);
+
+  public ngOnInit(): void {
+    this.refreshAll();
+  }
+
+  public refreshAll(): void {
+    this.adminService.fetchStudents().subscribe();
+    this.adminService.fetchParents().subscribe();
+    this.adminService.fetchRoutes().subscribe();
+    this.adminService.fetchStops().subscribe();
+    this.adminService.fetchBuses().subscribe();
+    this.adminService.fetchDrivers().subscribe();
+    this.adminService.fetchSubscriptions().subscribe();
+    this.adminService.fetchPayments().subscribe();
+  }
 
   public readonly activeTab = signal<AdminTab>('overview');
 
@@ -299,6 +316,9 @@ export class AdminDashboard {
     'RoundTrip': 'ذهاب وإياب',
     'OneWay': 'اتجاه واحد',
     'Select Route': 'اختر المسار',
+    'Awaiting Approval': 'بانتظار الموافقة المبدئية',
+    'Pending Approval': 'قيد الموافقة',
+    'Requires preliminary approval before payment': 'يتطلب موافقة مبدئية قبل تسجيل الدفع',
     '© 2026 Basi School Transportation. All rights reserved.':
       '© 2026 مكتب الباصي للنقل المدرسي. جميع الحقوق محفوظة.',
   };
@@ -312,34 +332,112 @@ export class AdminDashboard {
 
   public setTab(tab: AdminTab): void {
     this.activeTab.set(tab);
+    if (tab === 'overview') {
+      this.refreshAll();
+    } else if (tab === 'students') {
+      this.adminService.fetchStudents().subscribe();
+    } else if (tab === 'parents') {
+      this.adminService.fetchParents().subscribe();
+    } else if (tab === 'routes') {
+      this.adminService.fetchRoutes().subscribe();
+    } else if (tab === 'stops') {
+      this.adminService.fetchStops().subscribe();
+    } else if (tab === 'buses') {
+      this.adminService.fetchBuses().subscribe();
+    } else if (tab === 'drivers') {
+      this.adminService.fetchDrivers().subscribe();
+    } else if (tab === 'subscriptions') {
+      this.adminService.fetchSubscriptions().subscribe();
+    } else if (tab === 'payments') {
+      this.adminService.fetchPayments().subscribe();
+      this.adminService.fetchSubscriptions().subscribe();
+    }
   }
 
   public approveSubscription(id: number): void {
-    this.adminService.approveSubscription(id);
+    this.adminService.approveSubscription(id).subscribe();
   }
 
   public rejectSubscription(id: number): void {
-    this.adminService.rejectSubscription(id);
+    this.adminService.rejectSubscription(id).subscribe();
   }
 
   public toggleRoute(id: number): void {
-    this.adminService.toggleRouteActive(id);
+    this.adminService.toggleRouteActive(id).subscribe();
   }
 
   public toggleBus(id: number): void {
-    this.adminService.toggleBusActive(id);
+    this.adminService.toggleBusActive(id).subscribe();
   }
 
   public toggleDriver(id: number): void {
-    this.adminService.toggleDriverActive(id);
+    this.adminService.toggleDriverActive(id).subscribe();
+  }
+
+  public isSubscriptionPending(pm: AdminPaymentItem): boolean {
+    const sub = this.resolveSubscription(pm);
+    return sub?.status === 'Pending';
+  }
+
+  public isPaymentEligible(pm: AdminPaymentItem): boolean {
+    if (pm.status === 'Paid') {
+      return false;
+    }
+    const sub = this.resolveSubscription(pm);
+    if (!sub) {
+      return true;
+    }
+    return sub.status === 'AwaitingPayment';
+  }
+
+  private resolveSubscription(pm: AdminPaymentItem): AdminSubscriptionItem | undefined {
+    if (pm.subscriptionId) {
+      const byId = this.adminService.subscriptions().find((s) => s.subscriptionId === pm.subscriptionId);
+      if (byId) return byId;
+    }
+    return this.adminService.subscriptions().find((s) => s.referenceNumber === pm.referenceNumber);
   }
 
   public markPaymentPaid(id: number): void {
-    this.adminService.updatePaymentStatus(id, 'Paid');
+    const payment = this.adminService.payments().find((p) => p.paymentId === id);
+    if (!payment) return;
+
+    let subId = payment.subscriptionId;
+    if (!subId) {
+      const matched = this.adminService.subscriptions().find((s) => s.referenceNumber === payment.referenceNumber);
+      if (matched) subId = matched.subscriptionId;
+    }
+
+    const fullAmount = payment.amountDue || 300;
+    this.adminService.updatePaymentStatus(id, 'Paid', fullAmount);
+
+    if (subId) {
+      this.adminService
+        .recordPayment({
+          subscriptionId: subId,
+          amount: fullAmount,
+          notes: 'Full payment confirmed by admin',
+        })
+        .subscribe(() => {
+          this.adminService.fetchPayments().subscribe();
+          this.adminService.fetchSubscriptions().subscribe();
+        });
+    }
+  }
+
+  public confirmSubscriptionPayment(sub: AdminSubscriptionItem): void {
+    this.adminService.recordPayment({
+      subscriptionId: sub.subscriptionId,
+      amount: sub.fee,
+      notes: 'Full payment confirmed by admin',
+    }).subscribe(() => {
+      this.adminService.fetchPayments().subscribe();
+      this.adminService.fetchSubscriptions().subscribe();
+    });
   }
 
   public deleteStop(id: number): void {
-    this.adminService.deleteStop(id);
+    this.adminService.deleteStop(id).subscribe();
   }
 
   public submitNewRoute(): void {
@@ -359,7 +457,7 @@ export class AdminDashboard {
       driverName: val.driverName.trim(),
       enrolledStudents: 0,
       isActive: true,
-    });
+    }).subscribe();
     this.routeForm.reset({
       routeNumber: '',
       name: '',
@@ -382,12 +480,12 @@ export class AdminDashboard {
     const route = this.adminService.routes().find(r => r.routeId === Number(val.routeId));
     this.adminService.addStop({
       routeId: Number(val.routeId),
-      routeNumber: route?.routeNumber || 'R101',
+      routeNumber: route?.routeNumber || 'R1',
       name: val.name.trim(),
       stopOrder: Number(val.stopOrder),
       pickupTime: val.pickupTime.trim(),
       dropoffTime: val.dropoffTime.trim(),
-    });
+    }).subscribe();
     this.stopForm.reset({
       routeId: 1,
       name: '',
@@ -409,7 +507,7 @@ export class AdminDashboard {
       capacity: Number(val.capacity),
       assignedRoute: val.assignedRoute.trim(),
       isActive: true,
-    });
+    }).subscribe();
     this.busForm.reset({
       plateNumber: '',
       capacity: 30,
@@ -430,7 +528,7 @@ export class AdminDashboard {
       licenseNumber: val.licenseNumber.trim(),
       assignedBus: val.assignedBus.trim(),
       isActive: true,
-    });
+    }).subscribe();
     this.driverForm.reset({
       fullName: '',
       phone: '',

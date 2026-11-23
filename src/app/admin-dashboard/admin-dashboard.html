@@ -214,7 +214,7 @@
                           {{ translate('Reject') }}
                         </button>
                       } @else if (req.status === 'AwaitingPayment') {
-                        <button type="button" class="btn-sm btn-success" (click)="activeTab.set('payments')">
+                        <button type="button" class="btn-sm btn-success" (click)="confirmSubscriptionPayment(req)">
                           {{ translate('Mark as Paid') }}
                         </button>
                       } @else {
@@ -822,7 +822,7 @@
                           {{ translate('Reject') }}
                         </button>
                       } @else if (sub.status === 'AwaitingPayment') {
-                        <button type="button" class="btn-sm btn-success" (click)="activeTab.set('payments')">
+                        <button type="button" class="btn-sm btn-success" (click)="confirmSubscriptionPayment(sub)">
                           {{ translate('Mark as Paid') }}
                         </button>
                       } @else {
@@ -911,12 +911,18 @@
                   </td>
                   <td>{{ pm.paymentDate }}</td>
                   <td>
-                    @if (pm.status !== 'Paid') {
+                    @if (pm.status === 'Paid') {
+                      <span class="text-muted">{{ translate('Paid') }}</span>
+                    } @else if (isSubscriptionPending(pm)) {
+                      <span class="status-badge status-pending" [title]="translate('Requires preliminary approval before payment')">
+                        {{ translate('Awaiting Approval') }}
+                      </span>
+                    } @else if (isPaymentEligible(pm)) {
                       <button type="button" class="btn-sm btn-success" (click)="markPaymentPaid(pm.paymentId)">
                         {{ translate('Mark as Paid') }}
                       </button>
                     } @else {
-                      <span class="text-muted">{{ translate('Paid') }}</span>
+                      <span class="text-muted">—</span>
                     }
                   </td>
                 </tr>
