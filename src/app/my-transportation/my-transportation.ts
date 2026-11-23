@@ -1,5 +1,5 @@
 
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Header } from '../header/header';
@@ -31,12 +31,16 @@ const REQUESTS_KEY = 'stms_transportation_requests';
   templateUrl: './my-transportation.html',
   styleUrl: './my-transportation.css',
 })
-export class MyTransportation {
+export class MyTransportation implements OnInit {
   protected readonly prefs = inject(PreferencesService);
   protected readonly t = this.prefs.t;
 
   private readonly authService = inject(AuthService);
   private readonly subscriptionService = inject(SubscriptionService);
+
+  public ngOnInit(): void {
+    this.subscriptionService.fetchSubscriptions().subscribe();
+  }
 
   protected readonly selectedSubscriptionId = signal<number | null>(null);
   protected readonly requestSubscriptionId = signal<number | null>(null);
@@ -47,13 +51,14 @@ export class MyTransportation {
 
   public readonly subscriptions = computed(() => {
     const email = this.authService.userEmail()?.toLowerCase();
+    const list = this.subscriptionService.subscriptions();
 
     if (!email) {
-      return [];
+      return list;
     }
 
-    return this.subscriptionService.subscriptions().filter(
-      (sub) => sub.parentEmail?.toLowerCase() === email
+    return list.filter(
+      (sub) => !sub.parentEmail || sub.parentEmail.toLowerCase() === email
     );
   });
 
@@ -79,7 +84,7 @@ export class MyTransportation {
   public readonly pendingSubscriptions = computed(
     () =>
       this.subscriptions().filter(
-        (sub) => sub.status === 'Pending'
+        (sub) => sub.status === 'Pending' || sub.status === 'AwaitingPayment'
       ).length
   );
 

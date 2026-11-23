@@ -2,6 +2,46 @@
   min-height: calc(100vh - 80px);
 }
 
+.registration-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: 8px;
+  margin-bottom: 1.75rem;
+  font-size: 0.95rem;
+}
+
+.registration-banner.banner-open {
+  background-color: #ecfdf5;
+  border: 1px solid #10b981;
+  color: #065f46;
+}
+
+.registration-banner.banner-closed {
+  background-color: #fef2f2;
+  border: 1px solid #ef4444;
+  color: #991b1b;
+}
+
+:host-context([data-theme="dark"]) .registration-banner.banner-open {
+  background-color: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #a7f3d0;
+}
+
+:host-context([data-theme="dark"]) .registration-banner.banner-closed {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fecaca;
+}
+
+.banner-notes {
+  margin-left: 0.5rem;
+  opacity: 0.85;
+  font-size: 0.85rem;
+}
+
 .warning-card {
   padding: 3rem 1.5rem;
   text-align: center;
@@ -19,7 +59,7 @@
   display: grid;
   grid-template-columns: 1.6fr 1fr;
   gap: 2rem;
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (max-width: 900px) {
@@ -29,26 +69,37 @@
 }
 
 .sub-form-card {
-  padding: 2rem;
+  padding: 1.75rem 2rem;
 }
 
 .form-step {
   border: none;
-  padding: 0;
-  margin: 0 0 1.75rem 0;
+  padding: 0 0 1.25rem 0;
+  margin: 0 0 1.25rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.form-step:last-of-type {
+  border-bottom: none;
+  margin-bottom: 1rem;
+  padding-bottom: 0;
 }
 
 .step-legend {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: var(--text-main);
-  margin-bottom: 0.75rem;
+  color: var(--primary);
+  margin-bottom: 0.65rem;
   display: block;
+}
+
+.step-group {
+  margin-bottom: 0;
 }
 
 .capacity-box {
   margin-top: 0.75rem;
-  padding: 0.75rem 1rem;
+  padding: 0.6rem 0.9rem;
   border-radius: 8px;
   background-color: var(--bg-alt);
   display: flex;
@@ -85,7 +136,7 @@
 .type-card {
   display: flex;
   flex-direction: column;
-  padding: 1rem;
+  padding: 0.9rem 1rem;
   border: 2px solid var(--border-color);
   border-radius: 8px;
   background-color: var(--bg-card);
@@ -132,6 +183,14 @@
   border: 1px solid var(--border-color);
   position: sticky;
   top: 90px;
+  align-self: start;
+  z-index: 10;
+}
+
+@media (max-width: 900px) {
+  .summary-card {
+    position: static;
+  }
 }
 
 .summary-heading {
@@ -203,4 +262,3 @@
   color: var(--text-subtle);
   line-height: 1.5;
 }
-

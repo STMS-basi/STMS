@@ -11,6 +11,29 @@
           <p class="section-subtitle">{{ t().subPageSubtitle }}</p>
         </div>
 
+        @if (registrationInfo(); as info) {
+          <div
+            class="registration-banner"
+            [class.banner-open]="info.isRegistrationOpen"
+            [class.banner-closed]="!info.isRegistrationOpen"
+            role="status"
+          >
+            <span class="banner-icon">{{ info.isRegistrationOpen ? '🟢' : '🔴' }}</span>
+            <div class="banner-text">
+              <strong>
+                {{ info.semesterName }} &bull;
+                {{ info.isRegistrationOpen
+                  ? (prefs.lang() === 'ar' ? 'التسجيل متاح حالياً' : 'Registration is currently open')
+                  : (prefs.lang() === 'ar' ? 'التسجيل مغلق حالياً' : 'Registration is currently closed') }}
+              </strong>
+              <span class="banner-notes">
+                ({{ prefs.lang() === 'ar' ? 'تاريخ الفتح:' : 'Opens:' }} {{ info.registrationOpenDate }} &bull;
+                 {{ prefs.lang() === 'ar' ? 'بداية الفصل:' : 'Starts:' }} {{ info.startDate }})
+              </span>
+            </div>
+          </div>
+        }
+
         @if (errorMessage()) {
           <div class="alert alert-error" role="alert">
             {{ errorMessage() }}
@@ -34,13 +57,13 @@
               <!-- Step 1: Select Student -->
               <fieldset class="form-step">
                 <legend class="step-legend">{{ t().selectStudentStep }}</legend>
-                <div class="form-group">
-                  <label for="studentId" class="form-label">{{ t().studentNameLabel }}</label>
+                <div class="form-group step-group">
                   <select
                     id="studentId"
                     formControlName="studentId"
                     class="form-input"
                     [class.input-error]="isFieldInvalid('studentId')"
+                    aria-label="Student Selection"
                   >
                     <option [value]="0" disabled>{{ t().selectStudentPlaceholder }}</option>
                     @for (student of students(); track student.studentId) {
@@ -55,19 +78,19 @@
                 </div>
               </fieldset>
 
-              <!-- Step 2: Select Route & Stop -->
+              <!-- Step 2: Select Route -->
               <fieldset class="form-step">
                 <legend class="step-legend">{{ t().selectRouteStep }}</legend>
-                <div class="form-group">
-                  <label for="routeId" class="form-label">{{ t().selectRouteStep }}</label>
+                <div class="form-group step-group">
                   <select
                     id="routeId"
                     formControlName="routeId"
                     class="form-input"
                     [class.input-error]="isFieldInvalid('routeId')"
+                    aria-label="Bus Route Selection"
                   >
                     <option [value]="0" disabled>{{ t().selectRoutePlaceholder }}</option>
-                    @for (r of routes(); track r.routeId) {
+                    @for (r of eligibleRoutes(); track r.routeId) {
                       <option [value]="r.routeId">
                         {{ r.routeNumber }}: {{ r.name }} ({{ r.serviceArea }})
                       </option>
@@ -88,16 +111,19 @@
                     }
                   </div>
                 }
+              </fieldset>
 
-                <!-- Step 3: Select Pickup Stop -->
-                <div class="form-group" style="margin-top: 1rem;">
-                  <label for="stopId" class="form-label">{{ t().selectStopStep }}</label>
+              <!-- Step 3: Select Pickup Stop -->
+              <fieldset class="form-step">
+                <legend class="step-legend">{{ t().selectStopStep }}</legend>
+                <div class="form-group step-group">
                   <select
                     id="stopId"
                     formControlName="stopId"
                     class="form-input"
                     [class.input-error]="isFieldInvalid('stopId')"
                     [attr.disabled]="availableStops().length === 0 ? true : null"
+                    aria-label="Pickup Stop Selection"
                   >
                     <option [value]="0" disabled>{{ t().selectStopPlaceholder }}</option>
                     @for (stop of availableStops(); track stop.stopId) {
@@ -167,7 +193,7 @@
                 </div>
 
                 <div class="summary-item">
-                  <span class="summary-label">{{ t().selectRouteStep }}</span>
+                  <span class="summary-label">{{ prefs.lang() === 'ar' ? 'مسار الحافلة' : 'Bus Route' }}</span>
                   <strong>{{ selectedRoute()?.name || 'Not selected' }}</strong>
                 </div>
 
@@ -216,4 +242,3 @@
     </div>
   </footer>
 </div>
-

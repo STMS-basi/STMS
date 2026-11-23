@@ -130,7 +130,9 @@ export class RouteService {
 
   // Get all stops belonging to a route
   getStopsByRoute(routeId: number): Observable<RouteStop[]> {
-    return this.http.get<RouteStop[]>(`/api/stops/route/${routeId}`);
+    return this.http.get<RouteStop[]>(`/api/stops/route/${routeId}`).pipe(
+      catchError(() => of((this.findRouteById(routeId)?.stops as RouteStop[]) ?? []))
+    );
   }
 
   // Load routes and save them in the shared signal with safe fallback

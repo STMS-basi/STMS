@@ -114,9 +114,14 @@ export class SubscriptionService {
   public fetchSubscriptions(): Observable<SubscriptionItem[]> {
     return this.http.get<SubscriptionItem[]>('/api/subscriptions').pipe(
       tap((items) => {
-        if (Array.isArray(items) && items.length > 0) {
-          this.subscriptionsSignal.set(items);
-          this.persist(items);
+        if (Array.isArray(items)) {
+          const email = this.authService.userEmail()?.toLowerCase() ?? '';
+          const mapped = items.map((item) => ({
+            ...item,
+            parentEmail: item.parentEmail || email,
+          }));
+          this.subscriptionsSignal.set(mapped);
+          this.persist(mapped);
         }
       }),
       catchError(() => of(this.subscriptionsSignal()))

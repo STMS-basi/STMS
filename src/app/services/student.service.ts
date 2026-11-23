@@ -133,7 +133,18 @@ export class StudentService {
         dateOfBirth: payload.dateOfBirth || null,
         notes: payload.notes?.trim() || null,
       })
-      .pipe(catchError(() => of(null)))
+      .pipe(
+        tap((res) => {
+          if (res && res.studentId) {
+            const synced = this.studentsSignal().map((s) =>
+              s.studentId === localId ? { ...s, studentId: res.studentId } : s
+            );
+            this.studentsSignal.set(synced);
+            this.persistStoredStudents(synced);
+          }
+        }),
+        catchError(() => of(null))
+      )
       .subscribe();
 
     return of({ success: true, studentId: localId });

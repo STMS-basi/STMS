@@ -17,25 +17,25 @@
           <a routerLink="/transport" class="btn btn-primary btn-lg">
             {{ t().heroViewServices }}
           </a>
-          <a routerLink="/routes" class="btn btn-outline btn-lg">
+          <a routerLink="/routes" class="btn btn-primary btn-lg">
             {{ t().navRoutesSafety }}
           </a>
           @if (!isAuthenticated()) {
-            <a routerLink="/register" class="btn btn-secondary btn-lg">
+            <a routerLink="/register" class="btn btn-primary btn-lg">
               {{ t().heroRegisterNow }}
             </a>
-            <a routerLink="/login" class="btn btn-outline btn-lg">
+            <a routerLink="/login" class="btn btn-primary btn-lg">
               {{ t().heroLogin }}
             </a>
           } @else if (isAdmin()) {
-            <a routerLink="/admin-dashboard" class="btn btn-secondary btn-lg">
+            <a routerLink="/admin-dashboard" class="btn btn-primary btn-lg">
               {{ prefs.lang() === 'ar' ? 'لوحة تحكم المسؤول' : 'Admin Dashboard' }}
             </a>
           } @else {
-            <a routerLink="/subscription" class="btn btn-secondary btn-lg">
+            <a routerLink="/subscription" class="btn btn-primary btn-lg">
               {{ prefs.lang() === 'ar' ? 'طلب اشتراك' : 'Request Subscription' }}
             </a>
-            <a routerLink="/my-transportation" class="btn btn-outline btn-lg">
+            <a routerLink="/my-transportation" class="btn btn-primary btn-lg">
               {{ prefs.lang() === 'ar' ? 'تفاصيل النقل' : 'My Transportation' }}
             </a>
           }
@@ -117,8 +117,8 @@
             {{ t().ctaDesc }}
           </p>
           <div class="cta-actions">
-            <a routerLink="/register" class="btn btn-dark btn-lg">{{ t().ctaRegisterBtn }}</a>
-            <a routerLink="/login" class="btn btn-outline-white btn-lg">{{ t().ctaLoginBtn }}</a>
+            <a routerLink="/register" class="btn btn-primary btn-lg">{{ t().ctaRegisterBtn }}</a>
+            <a routerLink="/login" class="btn btn-primary btn-lg">{{ t().ctaLoginBtn }}</a>
           </div>
         </div>
       </section>

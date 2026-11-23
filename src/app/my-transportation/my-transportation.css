@@ -116,6 +116,12 @@
   color: #92400e;
 }
 
+.status-awaiting {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+}
+
 .status-rejected {
   background: #fee2e2;
   color: #991b1b;

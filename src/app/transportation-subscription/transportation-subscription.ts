@@ -5,7 +5,7 @@ import { Header } from '../header/header';
 import { PreferencesService } from '../services/preferences.service';
 import { RouteItem, RouteService, RouteStop } from '../services/route.service';
 import { StudentItem, StudentService } from '../services/student.service';
-import { SubscriptionService, TransportType } from '../services/subscription.service';
+import { RegistrationInfo, SubscriptionService, TransportType } from '../services/subscription.service';
 
 @Component({
   selector: 'app-transportation-subscription',
@@ -29,6 +29,8 @@ export class TransportationSubscription implements OnInit {
 
   protected readonly isSubmitting = signal<boolean>(false);
   protected readonly errorMessage = signal<string | null>(null);
+  protected readonly registrationInfo = signal<RegistrationInfo | null>(null);
+  protected readonly routeStopsSignal = signal<readonly RouteStop[]>([]);
 
   protected readonly selectedStudentId = signal<number>(0);
   protected readonly selectedRouteId = signal<number>(0);
@@ -47,12 +49,24 @@ export class TransportationSubscription implements OnInit {
     return this.students().find((s) => s.studentId === sId);
   });
 
+  public readonly eligibleRoutes = computed<readonly RouteItem[]>(() => {
+    return this.routes().filter((r) => {
+      if (r.isActive === false) return false;
+      const num = r.routeNumber?.toUpperCase() ?? '';
+      const name = r.name?.toUpperCase() ?? '';
+      if (num.startsWith('TEST') || name.startsWith('TEST')) return false;
+      return true;
+    });
+  });
+
   public readonly selectedRoute = computed<RouteItem | undefined>(() => {
     const rId = this.selectedRouteId();
     return this.routes().find((r) => r.routeId === rId);
   });
 
   public readonly availableStops = computed<readonly RouteStop[]>(() => {
+    const fetched = this.routeStopsSignal();
+    if (fetched.length > 0) return fetched;
     return this.selectedRoute()?.stops ?? [];
   });
 
@@ -64,7 +78,9 @@ export class TransportationSubscription implements OnInit {
   public readonly remainingSeats = computed<number>(() => {
     const r = this.selectedRoute();
     if (!r) return 0;
-    return Math.max(0, r.capacity - r.enrolledStudents);
+    const enrolled = typeof r.enrolledStudents === 'number' && !isNaN(r.enrolledStudents) ? r.enrolledStudents : 0;
+    const capacity = typeof r.capacity === 'number' && !isNaN(r.capacity) ? r.capacity : 30;
+    return Math.max(0, capacity - enrolled);
   });
 
   public readonly isRouteFull = computed<boolean>(() => {
@@ -77,7 +93,28 @@ export class TransportationSubscription implements OnInit {
   });
 
   public ngOnInit(): void {
-    this.studentService.fetchStudents().subscribe();
+    this.subscriptionService.getRegistrationInfo().subscribe((info) => {
+      this.registrationInfo.set(info);
+    });
+
+    const applyStudentParam = (studentsList: readonly StudentItem[]) => {
+      const qStudentId = this.route.snapshot.queryParamMap.get('studentId');
+      if (qStudentId) {
+        const id = Number(qStudentId);
+        const match = studentsList.find((s) => s.studentId === id);
+        if (match) {
+          this.selectedStudentId.set(match.studentId);
+          this.subForm.patchValue({ studentId: match.studentId });
+        }
+      }
+    };
+
+    applyStudentParam(this.students());
+
+    this.studentService.fetchStudents().subscribe((students) => {
+      applyStudentParam(students && students.length > 0 ? students : this.students());
+    });
+
     this.routeService.fetchRoutes().subscribe();
 
     this.subForm.get('studentId')?.valueChanges.subscribe((id) => {
@@ -85,9 +122,29 @@ export class TransportationSubscription implements OnInit {
     });
 
     this.subForm.get('routeId')?.valueChanges.subscribe((id) => {
-      this.selectedRouteId.set(Number(id));
+      const numId = Number(id);
+      this.selectedRouteId.set(numId);
       this.selectedStopId.set(0);
       this.subForm.patchValue({ stopId: 0 }, { emitEvent: false });
+
+      if (numId > 0) {
+        this.routeService.getStopsByRoute(numId).subscribe({
+          next: (stops) => {
+            if (stops && stops.length > 0) {
+              this.routeStopsSignal.set(stops);
+            } else {
+              const currentRoute = this.routes().find((r) => r.routeId === numId);
+              this.routeStopsSignal.set(currentRoute?.stops ?? []);
+            }
+          },
+          error: () => {
+            const currentRoute = this.routes().find((r) => r.routeId === numId);
+            this.routeStopsSignal.set(currentRoute?.stops ?? []);
+          },
+        });
+      } else {
+        this.routeStopsSignal.set([]);
+      }
     });
 
     this.subForm.get('stopId')?.valueChanges.subscribe((id) => {

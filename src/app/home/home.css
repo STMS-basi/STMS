@@ -42,6 +42,23 @@
   flex-wrap: wrap;
 }
 
+.hero-actions .btn,
+.cta-actions .btn {
+  background-color: var(--primary) !important;
+  color: var(--primary-contrast) !important;
+  border: 1px solid var(--primary) !important;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.hero-actions .btn:hover,
+.cta-actions .btn:hover {
+  background-color: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 /* Grids */
 .cards-grid,
 .info-grid,

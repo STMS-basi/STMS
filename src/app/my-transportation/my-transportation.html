@@ -135,7 +135,8 @@
                     <span
                       class="status-badge"
                       [class.status-approved]="sub.status === 'Approved'"
-                      [class.status-pending]="sub.status === 'Pending' || sub.status === 'AwaitingPayment'"
+                      [class.status-pending]="sub.status === 'Pending'"
+                      [class.status-awaiting]="sub.status === 'AwaitingPayment'"
                       [class.status-rejected]="sub.status === 'Rejected'"
                     >
                       {{ statusText(sub.status) }}
@@ -199,7 +200,7 @@
                   <div class="subscription-footer">
                     <div class="fee-info">
                       <span>
-                        {{ prefs.lang() === 'ar' ? 'الرسوم الشهرية' : 'Monthly Fee' }}
+                        {{ prefs.lang() === 'ar' ? 'رسوم الفصل الدراسي' : 'Semester Fee' }}
                       </span>
                       <strong>{{ sub.fee }} JOD</strong>
                     </div>

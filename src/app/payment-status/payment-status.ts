@@ -1,5 +1,5 @@
 
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Header } from '../header/header';
@@ -21,12 +21,16 @@ interface PaymentRecord {
   templateUrl: './payment-status.html',
   styleUrl: './payment-status.css',
 })
-export class PaymentStatus {
+export class PaymentStatus implements OnInit {
   protected readonly prefs = inject(PreferencesService);
   protected readonly t = this.prefs.t;
 
   private readonly authService = inject(AuthService);
   private readonly subscriptionService = inject(SubscriptionService);
+
+  public ngOnInit(): void {
+    this.subscriptionService.fetchSubscriptions().subscribe();
+  }
 
   protected readonly selectedPayment = signal<PaymentRecord | null>(null);
 
@@ -36,22 +40,20 @@ export class PaymentStatus {
 
   public readonly payments = computed<PaymentRecord[]>(() => {
     const email = this.authService.userEmail()?.toLowerCase();
+    const list = this.subscriptionService.subscriptions();
+    const filtered = !email
+      ? list
+      : list.filter(
+          (sub) => !sub.parentEmail || sub.parentEmail.toLowerCase() === email
+        );
 
-    if (!email) {
-      return [];
-    }
-
-    return this.subscriptionService.subscriptions()
-      .filter(
-        (sub) => sub.parentEmail?.toLowerCase() === email
-      )
-      .map((sub) => ({
-        subscription: sub,
-        amountDue: sub.fee,
-        amountPaid: 0,
-        outstandingBalance: sub.fee,
-        paymentStatus: 'Managed by School Administration',
-      }));
+    return filtered.map((sub) => ({
+      subscription: sub,
+      amountDue: sub.fee,
+      amountPaid: 0,
+      outstandingBalance: sub.fee,
+      paymentStatus: 'Managed by School Administration',
+    }));
   });
 
   public readonly totalDue = computed(() =>
