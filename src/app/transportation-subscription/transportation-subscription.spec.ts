@@ -124,4 +124,14 @@ describe('TransportationSubscription', () => {
     expect(subscriptionService.subscriptions()[0].studentName).toBe('Sara Student');
     expect(navigateSpy).toHaveBeenCalled();
   });
+
+  it('should map registrationInfo from backend response and format dates correctly', () => {
+    subscriptionService.getRegistrationInfo().subscribe((info) => {
+      expect(info.registrationOpen).toBe(true);
+      expect(info.isRegistrationOpen).toBe(true);
+      expect(info.semesterName).toBe('First Semester 2026/2027');
+      expect(info.startDate).toContain('September 1, 2026');
+      expect(info.registrationOpenDate).toContain('August 18, 2026');
+    });
+  });
 });

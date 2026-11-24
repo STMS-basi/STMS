@@ -157,7 +157,7 @@
                       <span>
                         {{ prefs.lang() === 'ar' ? 'المسار' : 'Route' }}
                       </span>
-                      <strong>{{ sub.routeNumber }} - {{ sub.routeName }}</strong>
+                      <strong>{{ formatRoute(sub) }}</strong>
                     </div>
 
                     <div class="info-item">
@@ -167,19 +167,23 @@
                       <strong>{{ sub.stopName }}</strong>
                     </div>
 
-                    <div class="info-item">
-                      <span>
-                        {{ prefs.lang() === 'ar' ? 'الاصطحاب الصباحي' : 'Morning Pickup' }}
-                      </span>
-                      <strong>{{ sub.pickupTime }}</strong>
-                    </div>
+                    @if (hasTime(sub.pickupTime)) {
+                      <div class="info-item">
+                        <span>
+                          {{ prefs.lang() === 'ar' ? 'الاصطحاب الصباحي' : 'Morning Pickup' }}
+                        </span>
+                        <strong>{{ sub.pickupTime }}</strong>
+                      </div>
+                    }
 
-                    <div class="info-item">
-                      <span>
-                        {{ prefs.lang() === 'ar' ? 'العودة بعد الظهر' : 'Afternoon Drop-off' }}
-                      </span>
-                      <strong>{{ sub.dropoffTime }}</strong>
-                    </div>
+                    @if (hasTime(sub.dropoffTime)) {
+                      <div class="info-item">
+                        <span>
+                          {{ prefs.lang() === 'ar' ? 'العودة بعد الظهر' : 'Afternoon Drop-off' }}
+                        </span>
+                        <strong>{{ sub.dropoffTime }}</strong>
+                      </div>
+                    }
 
                     <div class="info-item">
                       <span>
@@ -213,24 +217,6 @@
                       >
                         {{ prefs.lang() === 'ar' ? 'عرض التفاصيل' : 'View Details' }}
                       </button>
-
-                      @if (sub.status !== 'Rejected') {
-                        <button
-                          type="button"
-                          class="btn btn-secondary"
-                          (click)="openRequest(sub, 'Modification')"
-                        >
-                          {{ prefs.lang() === 'ar' ? 'طلب تعديل' : 'Request Modification' }}
-                        </button>
-
-                        <button
-                          type="button"
-                          class="btn btn-danger"
-                          (click)="openRequest(sub, 'Cancellation')"
-                        >
-                          {{ prefs.lang() === 'ar' ? 'طلب إلغاء' : 'Request Cancellation' }}
-                        </button>
-                      }
                     </div>
                   </div>
 
@@ -261,8 +247,14 @@
                 <div class="modal-details">
                   <p><strong>{{ prefs.lang() === 'ar' ? 'الطالب:' : 'Student:' }}</strong> {{ sub.studentName }}</p>
                   <p><strong>{{ prefs.lang() === 'ar' ? 'المرجع:' : 'Reference:' }}</strong> {{ sub.referenceNumber }}</p>
-                  <p><strong>{{ prefs.lang() === 'ar' ? 'المسار:' : 'Route:' }}</strong> {{ sub.routeNumber }} - {{ sub.routeName }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'المسار:' : 'Route:' }}</strong> {{ formatRoute(sub) }}</p>
                   <p><strong>{{ prefs.lang() === 'ar' ? 'نقطة الاصطحاب:' : 'Pickup Stop:' }}</strong> {{ sub.stopName }}</p>
+                  @if (hasTime(sub.pickupTime)) {
+                    <p><strong>{{ prefs.lang() === 'ar' ? 'الاصطحاب الصباحي:' : 'Morning Pickup:' }}</strong> {{ sub.pickupTime }}</p>
+                  }
+                  @if (hasTime(sub.dropoffTime)) {
+                    <p><strong>{{ prefs.lang() === 'ar' ? 'العودة بعد الظهر:' : 'Afternoon Drop-off:' }}</strong> {{ sub.dropoffTime }}</p>
+                  }
                   <p><strong>{{ prefs.lang() === 'ar' ? 'نوع النقل:' : 'Transport Type:' }}</strong> {{ sub.transportType === 'RoundTrip' ? (prefs.lang() === 'ar' ? 'ذهاب وإياب' : 'Round Trip') : (prefs.lang() === 'ar' ? 'اتجاه واحد' : 'One Way') }}</p>
                   <p><strong>{{ prefs.lang() === 'ar' ? 'الحالة:' : 'Status:' }}</strong> {{ statusText(sub.status) }}</p>
                   <p><strong>{{ prefs.lang() === 'ar' ? 'الحافلة:' : 'Assigned Bus:' }}</strong> {{ prefs.lang() === 'ar' ? 'لم يتم التعيين بعد' : 'Not assigned yet' }}</p>

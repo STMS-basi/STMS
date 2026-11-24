@@ -220,6 +220,27 @@ export class MyTransportation implements OnInit {
     }
   }
 
+  public formatRoute(sub: SubscriptionItem): string {
+    const num = (sub.routeNumber || '').trim();
+    let name = (sub.routeName || '').trim();
+    // Clean any leading dash/hyphen or bullet
+    name = name.replace(/^[-–—•]\s*/, '');
+
+    if (num && name) {
+      if (name.startsWith(num)) {
+        return name;
+      }
+      return `${num} - ${name}`;
+    }
+    return name || num || (this.prefs.lang() === 'ar' ? 'غير محدد' : 'Unassigned');
+  }
+
+  public hasTime(time?: string | null): boolean {
+    if (!time) return false;
+    const trimmed = time.trim();
+    return trimmed.length > 0 && trimmed !== '—' && trimmed !== '-' && trimmed !== 'null' && trimmed !== 'undefined';
+  }
+
   protected clearMessages(): void {
     this.successMessage.set('');
     this.errorMessage.set('');

@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, catchError, of, tap } from 'rxjs';
+import { Observable, catchError, map, of, tap } from 'rxjs';
 import { AuthService } from './auth.service';
 
 export type TransportType = 'OneWay' | 'RoundTrip';
@@ -59,7 +59,20 @@ export interface RegistrationInfo {
   readonly startDate: string;
   readonly endDate: string;
   readonly registrationOpenDate: string;
+  readonly registrationOpen: boolean;
   readonly isRegistrationOpen: boolean;
+  readonly message?: string;
+}
+
+/** Raw shape returned by GET /api/subscriptions/registration-info */
+interface RegistrationInfoRaw {
+  readonly registrationOpen?: boolean | string | number;
+  readonly isRegistrationOpen?: boolean | string | number;
+  readonly semesterName?: string;
+  readonly startDate?: string;
+  readonly endDate?: string;
+  readonly registrationOpenDate?: string;
+  readonly message?: string;
 }
 
 const STORAGE_SUBSCRIPTIONS_KEY = 'stms_subscriptions';
@@ -112,14 +125,34 @@ export class SubscriptionService {
   }
 
   public fetchSubscriptions(): Observable<SubscriptionItem[]> {
-    return this.http.get<SubscriptionItem[]>('/api/subscriptions').pipe(
-      tap((items) => {
-        if (Array.isArray(items)) {
-          const email = this.authService.userEmail()?.toLowerCase() ?? '';
-          const mapped = items.map((item) => ({
-            ...item,
-            parentEmail: item.parentEmail || email,
-          }));
+    return this.http.get<unknown[]>('/api/subscriptions').pipe(
+      map((items) => {
+        if (!Array.isArray(items)) return [];
+        const email = this.authService.userEmail()?.toLowerCase() ?? '';
+        return items.map((raw: any): SubscriptionItem => ({
+          subscriptionId: Number(raw.subscriptionId ?? raw.id ?? 0),
+          referenceNumber: String(raw.referenceNumber ?? ''),
+          studentId: Number(raw.studentId ?? 0),
+          studentName: String(raw.studentName ?? raw.student ?? ''),
+          studentGrade: String(raw.studentGrade ?? raw.grade ?? ''),
+          routeId: Number(raw.routeId ?? 0),
+          routeNumber: String(raw.routeNumber ?? raw.route?.routeNumber ?? ''),
+          routeName: String(raw.routeName ?? raw.route?.name ?? raw.route?.routeName ?? ''),
+          stopId: Number(raw.stopId ?? 0),
+          stopName: String(raw.stopName ?? raw.stop?.name ?? ''),
+          pickupTime: String(raw.pickupTime ?? raw.pickUpTime ?? raw.stop?.pickupTime ?? ''),
+          dropoffTime: String(raw.dropoffTime ?? raw.dropOffTime ?? raw.stop?.dropoffTime ?? ''),
+          transportType: (raw.transportType === 'OneWay' ? 'OneWay' : 'RoundTrip') as TransportType,
+          fee: Number(raw.fee ?? (raw.transportType === 'OneWay' ? 150 : 300)),
+          status: (raw.status ?? 'Pending') as SubscriptionStatus,
+          startDate: String(raw.startDate ?? '2026-09-01'),
+          endDate: String(raw.endDate ?? '2026-12-31'),
+          requestedAt: String(raw.requestedAt ?? raw.createdAt ?? new Date().toISOString()),
+          parentEmail: String(raw.parentEmail || email),
+        }));
+      }),
+      tap((mapped) => {
+        if (mapped.length > 0) {
           this.subscriptionsSignal.set(mapped);
           this.persist(mapped);
         }
@@ -129,17 +162,65 @@ export class SubscriptionService {
   }
 
   public getRegistrationInfo(): Observable<RegistrationInfo> {
-    return this.http.get<RegistrationInfo>('/api/subscriptions/registration-info').pipe(
+    return this.http.get<RegistrationInfoRaw>('/api/subscriptions/registration-info').pipe(
+      map((raw) => this.mapRegistrationInfo(raw)),
       catchError(() =>
         of({
-          semesterName: 'Second Semester 2026/2027',
-          startDate: '2027-01-15',
-          endDate: '2027-05-31',
-          registrationOpenDate: '2027-01-01',
+          semesterName: 'First Semester 2026/2027',
+          startDate: this.formatDate('2026-09-01'),
+          endDate: this.formatDate('2026-12-31'),
+          registrationOpenDate: this.formatDate('2026-08-18'),
+          registrationOpen: true,
           isRegistrationOpen: true,
+          message: 'Registration is open',
         })
       )
     );
+  }
+
+  private mapRegistrationInfo(raw: RegistrationInfoRaw): RegistrationInfo {
+    const rawVal = raw.registrationOpen ?? raw.isRegistrationOpen;
+    const isOpen = rawVal === true || rawVal === 'true' || rawVal === 1;
+
+    let openDateStr = '';
+    if (raw.registrationOpenDate) {
+      openDateStr = this.formatDate(raw.registrationOpenDate);
+    } else if (raw.startDate) {
+      try {
+        const d = new Date(raw.startDate);
+        if (!isNaN(d.getTime())) {
+          d.setDate(d.getDate() - 14);
+          openDateStr = this.formatDate(d.toISOString());
+        }
+      } catch {
+        openDateStr = '';
+      }
+    }
+
+    return {
+      semesterName: raw.semesterName ?? 'First Semester 2026/2027',
+      startDate: this.formatDate(raw.startDate ?? ''),
+      endDate: this.formatDate(raw.endDate ?? ''),
+      registrationOpenDate: openDateStr,
+      registrationOpen: isOpen,
+      isRegistrationOpen: isOpen,
+      message: raw.message,
+    };
+  }
+
+  private formatDate(dateStr: string): string {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch {
+      return dateStr;
+    }
   }
 
   public createSubscription(

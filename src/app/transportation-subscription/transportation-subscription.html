@@ -14,21 +14,25 @@
         @if (registrationInfo(); as info) {
           <div
             class="registration-banner"
-            [class.banner-open]="info.isRegistrationOpen"
-            [class.banner-closed]="!info.isRegistrationOpen"
+            [class.banner-open]="info.registrationOpen || info.isRegistrationOpen"
+            [class.banner-closed]="!(info.registrationOpen || info.isRegistrationOpen)"
             role="status"
           >
-            <span class="banner-icon">{{ info.isRegistrationOpen ? '🟢' : '🔴' }}</span>
+            <span class="banner-icon">{{ (info.registrationOpen || info.isRegistrationOpen) ? '🟢' : '🔴' }}</span>
             <div class="banner-text">
               <strong>
                 {{ info.semesterName }} &bull;
-                {{ info.isRegistrationOpen
+                {{ (info.registrationOpen || info.isRegistrationOpen)
                   ? (prefs.lang() === 'ar' ? 'التسجيل متاح حالياً' : 'Registration is currently open')
                   : (prefs.lang() === 'ar' ? 'التسجيل مغلق حالياً' : 'Registration is currently closed') }}
               </strong>
               <span class="banner-notes">
-                ({{ prefs.lang() === 'ar' ? 'تاريخ الفتح:' : 'Opens:' }} {{ info.registrationOpenDate }} &bull;
-                 {{ prefs.lang() === 'ar' ? 'بداية الفصل:' : 'Starts:' }} {{ info.startDate }})
+                @if (info.registrationOpenDate) {
+                  ({{ prefs.lang() === 'ar' ? 'تاريخ الفتح:' : 'Opens:' }} {{ info.registrationOpenDate }} &bull;
+                   {{ prefs.lang() === 'ar' ? 'بداية الفصل:' : 'Starts:' }} {{ info.startDate }})
+                } @else {
+                  ({{ prefs.lang() === 'ar' ? 'بداية الفصل:' : 'Starts:' }} {{ info.startDate }})
+                }
               </span>
             </div>
           </div>
