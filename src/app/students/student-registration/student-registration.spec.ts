@@ -1,12 +1,15 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
 import { StudentRegistration } from './student-registration';
 import { StudentService } from '../../services/student.service';
 
 describe('StudentRegistration', () => {
   let studentService: StudentService;
+  let authService: AuthService;
+  let httpTesting: HttpTestingController;
 
   beforeEach(async () => {
     localStorage.clear();
@@ -16,18 +19,39 @@ describe('StudentRegistration', () => {
     }).compileComponents();
 
     studentService = TestBed.inject(StudentService);
+    authService = TestBed.inject(AuthService);
+    httpTesting = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => {
     localStorage.clear();
   });
 
-  it('should create the StudentRegistration component and show initial mock students', () => {
+  it('should create the StudentRegistration component and load students from GET /api/students', () => {
+    authService.setSession({
+      token: 'jwt',
+      role: 'Parent',
+      fullName: 'Parent User',
+      email: 'parent@example.com',
+    });
+
     const fixture = TestBed.createComponent(StudentRegistration);
     fixture.detectChanges();
+
+    httpTesting.expectOne('/api/students').flush([
+      {
+        studentId: 11,
+        fullName: 'Tariq Parent Child',
+        grade: 'Grade 4',
+        className: '4A',
+      },
+    ]);
+    fixture.detectChanges();
+
     const component = fixture.componentInstance;
     expect(component).toBeTruthy();
-    expect(component.students().length).toBeGreaterThan(0);
+    expect(component.students().length).toBe(1);
+    expect(component.students()[0].fullName).toBe('Tariq Parent Child');
   });
 
   it('should invalidate an empty form', () => {
@@ -115,5 +139,25 @@ describe('StudentRegistration', () => {
 
     component['deleteStudent'](created.studentId);
     expect(studentService.students().some((s) => s.studentId === created.studentId)).toBe(false);
+  });
+
+  it('should reject a future Date of Birth and show validation error on submit', () => {
+    const fixture = TestBed.createComponent(StudentRegistration);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const dobControl = component['studentForm'].get('dateOfBirth');
+
+    dobControl?.setValue('2030-02-22');
+    expect(dobControl?.valid).toBe(false);
+    expect(dobControl?.hasError('futureDate')).toBe(true);
+
+    component['onSubmit']();
+    fixture.detectChanges();
+
+    expect(component['isFieldInvalid']('dateOfBirth')).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain(component['t']().studentDobFutureError);
+
+    dobControl?.setValue('2016-05-10');
+    expect(dobControl?.valid).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, catchError, of, tap } from 'rxjs';
+import { Observable, catchError, map, of, tap } from 'rxjs';
 
 export interface RouteStop {
   readonly stopId: number;
@@ -20,6 +20,27 @@ export interface RouteItem {
   readonly capacity: number;
   readonly enrolledStudents: number;
   readonly isActive: boolean;
+  readonly busId?: number | null;
+  readonly busPlate?: string | null;
+  readonly assignedBus?: string | null;
+  readonly plateNumber?: string | null;
+  readonly bus?: {
+    readonly busId?: number;
+    readonly plateNumber?: string;
+    readonly busPlate?: string;
+    readonly model?: string;
+  } | null;
+  readonly driverId?: number | null;
+  readonly driverName?: string | null;
+  readonly assignedDriver?: string | null;
+  readonly driver?:
+    | string
+    | {
+        readonly driverId?: number;
+        readonly fullName?: string;
+        readonly name?: string;
+      }
+    | null;
   readonly stops: readonly RouteStop[];
 }
 
@@ -141,9 +162,27 @@ export class RouteService {
 
   // Get all stops belonging to a route
   getStopsByRoute(routeId: number): Observable<RouteStop[]> {
-    return this.http.get<RouteStop[]>(`/api/stops/route/${routeId}`).pipe(
-      catchError(() => of((this.findRouteById(routeId)?.stops as RouteStop[]) ?? []))
+    return this.http.get<unknown[]>(`/api/stops/route/${routeId}`).pipe(
+      map((items) =>
+        Array.isArray(items) ? items.map((item) => this.normalizeStop(item)) : []
+      ),
+      catchError(() => of((this.findLiveRouteById(routeId)?.stops as RouteStop[]) ?? []))
     );
+  }
+
+  private normalizeStop(rawInput: unknown): RouteStop {
+    const raw = (rawInput && typeof rawInput === 'object' ? rawInput : {}) as Record<string, unknown>;
+    return {
+      stopId: Number(raw['stopId'] ?? raw['StopId'] ?? raw['id'] ?? raw['Id'] ?? 0) || 0,
+      name: String(raw['name'] ?? raw['Name'] ?? raw['stopName'] ?? raw['StopName'] ?? '').trim(),
+      stopOrder: Number(raw['stopOrder'] ?? raw['StopOrder'] ?? raw['order'] ?? 0) || 0,
+      pickupTime: String(
+        raw['pickupTime'] ?? raw['PickupTime'] ?? raw['pickUpTime'] ?? raw['PickUpTime'] ?? ''
+      ).trim(),
+      dropoffTime: String(
+        raw['dropoffTime'] ?? raw['DropoffTime'] ?? raw['dropOffTime'] ?? raw['DropOffTime'] ?? ''
+      ).trim(),
+    };
   }
 
   // Load routes and save them in the shared signal with safe fallback

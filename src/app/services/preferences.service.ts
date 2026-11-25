@@ -88,8 +88,6 @@ export interface AppTranslations {
   readonly confirmPasswordRequiredError: string;
   readonly passwordMismatchError: string;
   readonly canManageTransportLabel: string;
-  readonly childNameLabel: string;
-  readonly childNamePlaceholder: string;
   readonly submitBtn: string;
   readonly submittingBtn: string;
   readonly loginPrompt: string;
@@ -133,6 +131,8 @@ export interface AppTranslations {
   readonly studentClassPlaceholder: string;
   readonly studentClassError: string;
   readonly studentDobLabel: string;
+  readonly studentDobFutureError: string;
+  readonly studentDobInvalidError: string;
   readonly studentNotesLabel: string;
   readonly studentNotesPlaceholder: string;
   readonly addStudentBtn: string;
@@ -317,8 +317,6 @@ const EN_TRANSLATIONS: AppTranslations = {
   passwordMismatchError: 'Passwords do not match.',
   canManageTransportLabel:
     'Allow this account to manage transportation information for my children',
-  childNameLabel: 'Child or Student Name (Optional)',
-  childNamePlaceholder: 'Enter child name to assign transportation',
   submitBtn: 'Complete Registration',
   submittingBtn: 'Creating Account...',
   loginPrompt: 'Already registered?',
@@ -361,6 +359,8 @@ const EN_TRANSLATIONS: AppTranslations = {
   studentClassPlaceholder: 'e.g. 5A or 4B',
   studentClassError: 'Class or section is required.',
   studentDobLabel: 'Date of Birth',
+  studentDobFutureError: 'Date of birth cannot be in the future.',
+  studentDobInvalidError: 'Please enter a valid date of birth.',
   studentNotesLabel: 'Special Notes (Medical or Pickup Instructions)',
   studentNotesPlaceholder: 'Any medical conditions, allergies, or specific pickup instructions',
   addStudentBtn: 'Register Student',
@@ -545,8 +545,6 @@ const AR_TRANSLATIONS: AppTranslations = {
   passwordMismatchError: 'كلمتا المرور غير متطابقتين.',
   canManageTransportLabel:
     'السماح لهذا الحساب بإدارة معلومات النقل لأبنائي',
-  childNameLabel: 'اسم الطالب أو الابن (اختياري)',
-  childNamePlaceholder: 'أدخل اسم الطالب لربط النقل المدرسي',
   submitBtn: 'إتمام التسجيل',
   submittingBtn: 'جاري إنشاء الحساب...',
   loginPrompt: 'مسجل مسبقاً؟',
@@ -589,6 +587,8 @@ const AR_TRANSLATIONS: AppTranslations = {
   studentClassPlaceholder: 'مثال: 5أ أو 4ب',
   studentClassError: 'الصف أو الشعبة مطلوب.',
   studentDobLabel: 'تاريخ الميلاد',
+  studentDobFutureError: 'تاريخ الميلاد لا يمكن أن يكون في المستقبل.',
+  studentDobInvalidError: 'يرجى إدخال تاريخ ميلاد صحيح.',
   studentNotesLabel: 'ملاحظات خاصة (طبية أو إرشادات نقل)',
   studentNotesPlaceholder: 'أي حالات صحية أو تنبيهات لمشرفي الحافلة',
   addStudentBtn: 'تسجيل الطالب',
@@ -692,6 +692,39 @@ export class PreferencesService {
     } catch {
       // Ignore storage write issues
     }
+  }
+
+  public formatDate(
+    value?: string | Date | null,
+    monthStyle: 'short' | 'long' = 'short'
+  ): string {
+    if (!value) return '—';
+
+    let parsed: Date;
+    if (value instanceof Date) {
+      parsed = value;
+    } else {
+      const trimmed = value.trim();
+      if (!trimmed) return '—';
+      const isoMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed);
+      parsed = isoMatch
+        ? new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]))
+        : new Date(trimmed);
+    }
+
+    if (isNaN(parsed.getTime())) {
+      return typeof value === 'string' ? value : '—';
+    }
+
+    const isAr = this.lang() === 'ar';
+    return parsed.toLocaleDateString(
+      isAr ? 'ar-EG-u-nu-latn' : 'en-US',
+      {
+        year: 'numeric',
+        month: isAr ? 'long' : monthStyle,
+        day: 'numeric',
+      }
+    );
   }
 
   private applyTheme(theme: Theme): void {

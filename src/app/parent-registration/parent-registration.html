@@ -139,21 +139,6 @@
               {{ t().canManageTransportLabel }}
             </span>
           </label>
-
-          @if (registerForm.get('canManageChildrenTransport')?.value) {
-            <div class="child-quick-add">
-              <label for="initialChildName" class="form-label-subtle">
-                {{ t().childNameLabel }}
-              </label>
-              <input
-                id="initialChildName"
-                type="text"
-                formControlName="initialChildName"
-                class="form-input"
-                [placeholder]="t().childNamePlaceholder"
-              />
-            </div>
-          }
         </div>
 
         <!-- Submit Button -->

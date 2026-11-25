@@ -92,7 +92,18 @@
                   type="date"
                   formControlName="dateOfBirth"
                   class="form-input"
+                  [max]="maxDobDate"
+                  [class.input-error]="isFieldInvalid('dateOfBirth')"
                 />
+                @if (isFieldInvalid('dateOfBirth')) {
+                  <p class="field-error">
+                    {{
+                      studentForm.get('dateOfBirth')?.hasError('futureDate')
+                        ? t().studentDobFutureError
+                        : t().studentDobInvalidError
+                    }}
+                  </p>
+                }
               </div>
 
               <!-- Notes -->

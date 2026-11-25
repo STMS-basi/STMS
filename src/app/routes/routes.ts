@@ -361,12 +361,17 @@ export class Routes implements OnInit {
       ) || 0;
 
     const busObj = this.asRecord(item['bus'] ?? item['Bus']);
+    const busId = Number(item['busId'] ?? item['BusId'] ?? busObj?.['busId'] ?? busObj?.['id'] ?? 0) || 0;
     const assignedBusRaw =
       this.pickStr(item, ['assignedBus', 'AssignedBus', 'busPlate', 'BusPlate', 'plateNumber', 'PlateNumber']) ||
       (busObj ? this.pickStr(busObj, ['plateNumber', 'PlateNumber', 'busPlate']) : '');
-    const assignedBus = assignedBusRaw && assignedBusRaw !== '—' ? assignedBusRaw : null;
+    const assignedBus =
+      (assignedBusRaw && assignedBusRaw !== '—' ? assignedBusRaw : null) ??
+      (busId > 0 ? `Bus #${busId}` : null);
 
     const driverObj = this.asRecord(item['driver'] ?? item['Driver']);
+    const driverId =
+      Number(item['driverId'] ?? item['DriverId'] ?? driverObj?.['driverId'] ?? driverObj?.['id'] ?? 0) || 0;
     let assignedDriverRaw = this.pickStr(item, ['assignedDriver', 'AssignedDriver', 'driverName', 'DriverName']);
     if (!assignedDriverRaw && typeof item['driver'] === 'string') {
       assignedDriverRaw = (item['driver'] as string).trim();
@@ -374,7 +379,9 @@ export class Routes implements OnInit {
     if (!assignedDriverRaw && driverObj) {
       assignedDriverRaw = this.pickStr(driverObj, ['fullName', 'FullName', 'name', 'Name']);
     }
-    const assignedDriver = assignedDriverRaw && assignedDriverRaw !== '—' ? assignedDriverRaw : null;
+    const assignedDriver =
+      (assignedDriverRaw && assignedDriverRaw !== '—' ? assignedDriverRaw : null) ??
+      (driverId > 0 ? `Driver #${driverId}` : null);
 
     const rawStops = Array.isArray(raw.stops)
       ? [...raw.stops].sort((a, b) => (a.stopOrder ?? 0) - (b.stopOrder ?? 0))

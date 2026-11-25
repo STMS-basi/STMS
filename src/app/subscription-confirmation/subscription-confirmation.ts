@@ -1,13 +1,12 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { DatePipe } from '@angular/common';
 import { Header } from '../header/header';
 import { PreferencesService } from '../services/preferences.service';
 import { SubscriptionItem, SubscriptionService } from '../services/subscription.service';
 
 @Component({
   selector: 'app-subscription-confirmation',
-  imports: [RouterLink, Header, DatePipe],
+  imports: [RouterLink, Header],
   templateUrl: './subscription-confirmation.html',
   styleUrl: './subscription-confirmation.css',
 })

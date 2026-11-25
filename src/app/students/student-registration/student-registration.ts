@@ -1,9 +1,55 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  NonNullableFormBuilder,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Header } from '../../header/header';
 import { PreferencesService } from '../../services/preferences.service';
 import { CreateStudentPayload, StudentItem, StudentService } from '../../services/student.service';
+
+function getLocalTodayIso(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function pastDateValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = typeof control.value === 'string' ? control.value.trim() : '';
+  if (!raw) {
+    return null;
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (!match) {
+    return { invalidDate: true };
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(year, month - 1, day);
+
+  if (
+    year < 1900 ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return { invalidDate: true };
+  }
+
+  if (raw > getLocalTodayIso()) {
+    return { futureDate: true };
+  }
+
+  return null;
+}
 
 @Component({
   selector: 'app-student-registration',
@@ -19,6 +65,7 @@ export class StudentRegistration implements OnInit {
   private readonly studentService = inject(StudentService);
 
   public readonly students = this.studentService.students;
+  protected readonly maxDobDate = getLocalTodayIso();
   protected readonly editingStudentId = signal<number | null>(null);
   protected readonly isSubmitting = signal<boolean>(false);
   protected readonly errorMessage = signal<string | null>(null);
@@ -44,7 +91,7 @@ export class StudentRegistration implements OnInit {
     fullName: ['', [Validators.required, Validators.minLength(3)]],
     grade: ['', [Validators.required]],
     className: ['', [Validators.required]],
-    dateOfBirth: [''],
+    dateOfBirth: ['', [pastDateValidator]],
     notes: [''],
   });
 
@@ -111,7 +158,7 @@ export class StudentRegistration implements OnInit {
       fullName: student.fullName,
       grade: student.grade,
       className: student.className,
-      dateOfBirth: student.dateOfBirth || '',
+      dateOfBirth: student.dateOfBirth ? student.dateOfBirth.slice(0, 10) : '',
       notes: student.notes || '',
     });
     this.errorMessage.set(null);

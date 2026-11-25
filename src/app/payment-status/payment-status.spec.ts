@@ -146,5 +146,14 @@ describe('PaymentStatus', () => {
     expect(modal).toBeTruthy();
     expect(modal.textContent).toContain('SUB-PAID-10');
     expect(modal.textContent).toContain('R2 - Jubeiha Route');
+
+    // Verify Arabic date formatting when language is switched to Arabic
+    component['prefs'].setLanguage('ar');
+    fixture.detectChanges();
+    const arHtml = fixture.nativeElement.textContent as string;
+    expect(arHtml).toContain('1 سبتمبر 2026');
+    expect(arHtml).toContain('31 ديسمبر 2026');
+    expect(arHtml).not.toContain('Sep 1, 2026');
+    component['prefs'].setLanguage('en');
   });
 });

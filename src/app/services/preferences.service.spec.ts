@@ -39,5 +39,17 @@ describe('PreferencesService', () => {
     expect(service.theme()).toBe('light');
     expect(service.isDark()).toBe(false);
   });
+
+  it('should format dates in Arabic when language is Arabic and in English otherwise', () => {
+    service.setLanguage('en');
+    expect(service.formatDate('2026-09-01')).toBe('Sep 1, 2026');
+    expect(service.formatDate('2026-12-31')).toBe('Dec 31, 2026');
+
+    service.setLanguage('ar');
+    expect(service.formatDate('2026-09-01')).toBe('1 سبتمبر 2026');
+    expect(service.formatDate('2026-12-31')).toBe('31 ديسمبر 2026');
+
+    service.setLanguage('en');
+  });
 });
 

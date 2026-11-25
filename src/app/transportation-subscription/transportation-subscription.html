@@ -21,19 +21,30 @@
             <span class="banner-icon">{{ (info.registrationOpen || info.isRegistrationOpen) ? '🟢' : '🔴' }}</span>
             <div class="banner-text">
               <strong>
-                {{ info.semesterName }} &bull;
+                <bdi>{{ formatSemesterName(info.semesterName) }}</bdi> &bull;
                 {{ (info.registrationOpen || info.isRegistrationOpen)
                   ? (prefs.lang() === 'ar' ? 'التسجيل متاح حالياً' : 'Registration is currently open')
                   : (prefs.lang() === 'ar' ? 'التسجيل مغلق حالياً' : 'Registration is currently closed') }}
               </strong>
-              <span class="banner-notes">
-                @if (info.registrationOpenDate) {
-                  ({{ prefs.lang() === 'ar' ? 'تاريخ الفتح:' : 'Opens:' }} {{ info.registrationOpenDate }} &bull;
-                   {{ prefs.lang() === 'ar' ? 'بداية الفصل:' : 'Starts:' }} {{ info.startDate }})
-                } @else {
-                  ({{ prefs.lang() === 'ar' ? 'بداية الفصل:' : 'Starts:' }} {{ info.startDate }})
-                }
-              </span>
+              @if (formatBannerDate(info.rawRegistrationOpenDate, info.registrationOpenDate) || formatBannerDate(info.rawStartDate, info.startDate)) {
+                <span class="banner-notes">
+                  @if (formatBannerDate(info.rawRegistrationOpenDate, info.registrationOpenDate); as openDate) {
+                    <span class="banner-date-item">
+                      <span>{{ prefs.lang() === 'ar' ? 'تاريخ الفتح:' : 'Opens:' }}</span>
+                      <bdi>{{ openDate }}</bdi>
+                    </span>
+                  }
+                  @if (formatBannerDate(info.rawRegistrationOpenDate, info.registrationOpenDate) && formatBannerDate(info.rawStartDate, info.startDate)) {
+                    <span aria-hidden="true">&bull;</span>
+                  }
+                  @if (formatBannerDate(info.rawStartDate, info.startDate); as startDate) {
+                    <span class="banner-date-item">
+                      <span>{{ prefs.lang() === 'ar' ? 'بداية الفصل:' : 'Starts:' }}</span>
+                      <bdi>{{ startDate }}</bdi>
+                    </span>
+                  }
+                </span>
+              }
             </div>
           </div>
         }
@@ -45,7 +56,13 @@
         }
 
         <!-- No Students Warning -->
-        @if (students().length === 0) {
+        @if (isLoadingStudents()) {
+          <div class="card warning-card">
+            <h2 class="warning-title">
+              {{ prefs.lang() === 'ar' ? 'جاري تحميل بيانات الطلاب...' : 'Loading registered students...' }}
+            </h2>
+          </div>
+        } @else if (students().length === 0) {
           <div class="card warning-card">
             <h2 class="warning-title">{{ t().noRegisteredStudentsWarning }}</h2>
             <div class="warning-action">
@@ -193,17 +210,17 @@
               <div class="summary-list">
                 <div class="summary-item">
                   <span class="summary-label">{{ t().studentNameLabel }}</span>
-                  <strong>{{ selectedStudent()?.fullName || 'Not selected' }}</strong>
+                  <strong>{{ selectedStudent()?.fullName || notSelectedText() }}</strong>
                 </div>
 
                 <div class="summary-item">
                   <span class="summary-label">{{ prefs.lang() === 'ar' ? 'مسار الحافلة' : 'Bus Route' }}</span>
-                  <strong>{{ selectedRoute()?.name || 'Not selected' }}</strong>
+                  <strong>{{ selectedRoute()?.name || notSelectedText() }}</strong>
                 </div>
 
                 <div class="summary-item">
                   <span class="summary-label">{{ t().selectedStopLabel }}</span>
-                  <strong>{{ selectedStop()?.name || 'Not selected' }}</strong>
+                  <strong>{{ selectedStop()?.name || notSelectedText() }}</strong>
                 </div>
 
                 <div class="summary-item">

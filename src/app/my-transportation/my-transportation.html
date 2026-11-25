@@ -167,21 +167,32 @@
                       <strong>{{ sub.stopName }}</strong>
                     </div>
 
-                    @if (hasTime(sub.pickupTime)) {
+                    <div class="info-item">
+                      <span>
+                        {{ prefs.lang() === 'ar' ? 'نوع النقل' : 'Transport Type' }}
+                      </span>
+                      <strong>
+                        {{ sub.transportType === 'RoundTrip'
+                          ? (prefs.lang() === 'ar' ? 'ذهاب وإياب' : 'Round Trip')
+                          : (prefs.lang() === 'ar' ? 'اتجاه واحد' : 'One Way') }}
+                      </strong>
+                    </div>
+
+                    @if (hasTime(morningPickupTime(sub))) {
                       <div class="info-item">
                         <span>
                           {{ prefs.lang() === 'ar' ? 'الاصطحاب الصباحي' : 'Morning Pickup' }}
                         </span>
-                        <strong>{{ sub.pickupTime }}</strong>
+                        <strong><bdi dir="ltr">{{ morningPickupTime(sub) }}</bdi></strong>
                       </div>
                     }
 
-                    @if (hasTime(sub.dropoffTime)) {
+                    @if (hasTime(afternoonDropoffTime(sub))) {
                       <div class="info-item">
                         <span>
                           {{ prefs.lang() === 'ar' ? 'العودة بعد الظهر' : 'Afternoon Drop-off' }}
                         </span>
-                        <strong>{{ sub.dropoffTime }}</strong>
+                        <strong><bdi dir="ltr">{{ afternoonDropoffTime(sub) }}</bdi></strong>
                       </div>
                     }
 
@@ -189,17 +200,25 @@
                       <span>
                         {{ prefs.lang() === 'ar' ? 'بداية الاشتراك' : 'Start Date' }}
                       </span>
-                      <strong>{{ sub.startDate | date:'mediumDate' }}</strong>
+                      <strong><bdi>{{ prefs.formatDate(sub.startDate) }}</bdi></strong>
                     </div>
 
                     <div class="info-item">
                       <span>
                         {{ prefs.lang() === 'ar' ? 'نهاية الاشتراك' : 'End Date' }}
                       </span>
-                      <strong>{{ sub.endDate | date:'mediumDate' }}</strong>
+                      <strong><bdi>{{ prefs.formatDate(sub.endDate) }}</bdi></strong>
                     </div>
 
                   </div>
+
+                  @if (hasAmbiguousOneWaySchedule(sub)) {
+                    <p class="one-way-schedule-note">
+                      {{ prefs.lang() === 'ar'
+                        ? 'اشتراك اتجاه واحد: يغطي إحدى الرحلتين الموضحتين أعلاه (الاصطحاب الصباحي أو العودة بعد الظهر).'
+                        : 'One-way subscription: covers your selected single direction from the stop times above.' }}
+                    </p>
+                  }
 
                   <div class="subscription-footer">
                     <div class="fee-info">
@@ -212,7 +231,7 @@
                     <div class="card-actions">
                       <button
                         type="button"
-                        class="btn btn-outline"
+                        class="btn btn-secondary"
                         (click)="viewDetails(sub)"
                       >
                         {{ prefs.lang() === 'ar' ? 'عرض التفاصيل' : 'View Details' }}
@@ -249,17 +268,17 @@
                   <p><strong>{{ prefs.lang() === 'ar' ? 'المرجع:' : 'Reference:' }}</strong> {{ sub.referenceNumber }}</p>
                   <p><strong>{{ prefs.lang() === 'ar' ? 'المسار:' : 'Route:' }}</strong> {{ formatRoute(sub) }}</p>
                   <p><strong>{{ prefs.lang() === 'ar' ? 'نقطة الاصطحاب:' : 'Pickup Stop:' }}</strong> {{ sub.stopName }}</p>
-                  @if (hasTime(sub.pickupTime)) {
-                    <p><strong>{{ prefs.lang() === 'ar' ? 'الاصطحاب الصباحي:' : 'Morning Pickup:' }}</strong> {{ sub.pickupTime }}</p>
+                  @if (hasTime(morningPickupTime(sub))) {
+                    <p><strong>{{ prefs.lang() === 'ar' ? 'الاصطحاب الصباحي:' : 'Morning Pickup:' }}</strong> <bdi dir="ltr">{{ morningPickupTime(sub) }}</bdi></p>
                   }
-                  @if (hasTime(sub.dropoffTime)) {
-                    <p><strong>{{ prefs.lang() === 'ar' ? 'العودة بعد الظهر:' : 'Afternoon Drop-off:' }}</strong> {{ sub.dropoffTime }}</p>
+                  @if (hasTime(afternoonDropoffTime(sub))) {
+                    <p><strong>{{ prefs.lang() === 'ar' ? 'العودة بعد الظهر:' : 'Afternoon Drop-off:' }}</strong> <bdi dir="ltr">{{ afternoonDropoffTime(sub) }}</bdi></p>
                   }
                   <p><strong>{{ prefs.lang() === 'ar' ? 'نوع النقل:' : 'Transport Type:' }}</strong> {{ sub.transportType === 'RoundTrip' ? (prefs.lang() === 'ar' ? 'ذهاب وإياب' : 'Round Trip') : (prefs.lang() === 'ar' ? 'اتجاه واحد' : 'One Way') }}</p>
                   <p><strong>{{ prefs.lang() === 'ar' ? 'الحالة:' : 'Status:' }}</strong> {{ statusText(sub.status) }}</p>
-                  <p><strong>{{ prefs.lang() === 'ar' ? 'الحافلة:' : 'Assigned Bus:' }}</strong> {{ prefs.lang() === 'ar' ? 'لم يتم التعيين بعد' : 'Not assigned yet' }}</p>
-                  <p><strong>{{ prefs.lang() === 'ar' ? 'السائق:' : 'Assigned Driver:' }}</strong> {{ prefs.lang() === 'ar' ? 'لم يتم التعيين بعد' : 'Not assigned yet' }}</p>
-                  <p><strong>{{ prefs.lang() === 'ar' ? 'الفترة:' : 'Subscription Period:' }}</strong> {{ sub.startDate | date:'mediumDate' }} - {{ sub.endDate | date:'mediumDate' }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'الحافلة:' : 'Assigned Bus:' }}</strong> {{ assignedBusText(sub) }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'السائق:' : 'Assigned Driver:' }}</strong> {{ assignedDriverText(sub) }}</p>
+                  <p><strong>{{ prefs.lang() === 'ar' ? 'الفترة:' : 'Subscription Period:' }}</strong> <bdi>{{ prefs.formatDate(sub.startDate) }}</bdi> - <bdi>{{ prefs.formatDate(sub.endDate) }}</bdi></p>
                   <p><strong>{{ prefs.lang() === 'ar' ? 'الرسوم:' : 'Fee:' }}</strong> {{ sub.fee }} JOD</p>
                 </div>
 

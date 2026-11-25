@@ -1,7 +1,8 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Header } from '../header/header';
+import { AuthService } from '../services/auth.service';
 import { PreferencesService } from '../services/preferences.service';
 import { RouteItem, RouteService, RouteStop } from '../services/route.service';
 import { StudentItem, StudentService } from '../services/student.service';
@@ -20,13 +21,24 @@ export class TransportationSubscription implements OnInit {
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly authService = inject(AuthService);
   private readonly studentService = inject(StudentService);
   private readonly routeService = inject(RouteService);
   private readonly subscriptionService = inject(SubscriptionService);
 
-  public readonly students = this.studentService.students;
+  public readonly students = computed<readonly StudentItem[]>(() => {
+    const list = this.studentService.students();
+    if (!this.authService.isAuthenticated()) {
+      return list;
+    }
+    const email = this.authService.userEmail()?.trim().toLowerCase();
+    if (!email) return [];
+    return list.filter((s) => s.parentEmail?.trim().toLowerCase() === email);
+  });
+
   public readonly routes = this.routeService.routes;
 
+  protected readonly isLoadingStudents = signal<boolean>(false);
   protected readonly isSubmitting = signal<boolean>(false);
   protected readonly errorMessage = signal<string | null>(null);
   protected readonly registrationInfo = signal<RegistrationInfo | null>(null);
@@ -36,6 +48,26 @@ export class TransportationSubscription implements OnInit {
   protected readonly selectedRouteId = signal<number>(0);
   protected readonly selectedStopId = signal<number>(0);
   protected readonly selectedTransportType = signal<TransportType>('RoundTrip');
+
+  private trackedEmail = this.authService.userEmail()?.trim().toLowerCase() ?? null;
+
+  constructor() {
+    effect(() => {
+      const currentEmail = this.authService.userEmail()?.trim().toLowerCase() ?? null;
+      if (currentEmail !== this.trackedEmail) {
+        this.trackedEmail = currentEmail;
+        untracked(() => {
+          this.selectedStudentId.set(0);
+          this.subForm.patchValue({ studentId: 0 }, { emitEvent: false });
+          if (this.authService.isAuthenticated()) {
+            this.loadStudentsForSession();
+          } else {
+            this.studentService.clearInMemoryStudents();
+          }
+        });
+      }
+    });
+  }
 
   protected readonly subForm = this.fb.group({
     studentId: [0, [Validators.required, Validators.min(1)]],
@@ -92,28 +124,38 @@ export class TransportationSubscription implements OnInit {
     return this.selectedTransportType() === 'OneWay' ? 150 : 300;
   });
 
+  protected readonly notSelectedText = computed(() =>
+    this.prefs.lang() === 'ar' ? 'غير محدد' : 'Not selected'
+  );
+
+  protected formatSemesterName(name?: string | null): string {
+    const trimmed = (name ?? '').trim();
+    if (!trimmed || this.prefs.lang() !== 'ar') {
+      return trimmed;
+    }
+
+    return trimmed
+      .replace(/^First Semester\b/i, 'الفصل الدراسي الأول')
+      .replace(/^Second Semester\b/i, 'الفصل الدراسي الثاني')
+      .replace(/^Summer Semester\b/i, 'الفصل الصيفي')
+      .replace(/^Fall Semester\b/i, 'فصل الخريف')
+      .replace(/^Spring Semester\b/i, 'فصل الربيع');
+  }
+
+  protected formatBannerDate(rawIso?: string, fallbackFormatted?: string): string {
+    const source = (rawIso || fallbackFormatted || '').trim();
+    if (!source) return '';
+    return this.prefs.formatDate(source, 'long');
+  }
+
   public ngOnInit(): void {
     this.subscriptionService.getRegistrationInfo().subscribe((info) => {
       this.registrationInfo.set(info);
     });
 
-    const applyStudentParam = (studentsList: readonly StudentItem[]) => {
-      const qStudentId = this.route.snapshot.queryParamMap.get('studentId');
-      if (qStudentId) {
-        const id = Number(qStudentId);
-        const match = studentsList.find((s) => s.studentId === id);
-        if (match) {
-          this.selectedStudentId.set(match.studentId);
-          this.subForm.patchValue({ studentId: match.studentId });
-        }
-      }
-    };
-
-    applyStudentParam(this.students());
-
-    this.studentService.fetchStudents().subscribe((students) => {
-      applyStudentParam(students && students.length > 0 ? students : this.students());
-    });
+    if (this.authService.isAuthenticated()) {
+      this.loadStudentsForSession();
+    }
 
     this.routeService.fetchRoutes().subscribe();
 
@@ -155,14 +197,35 @@ export class TransportationSubscription implements OnInit {
       this.selectedTransportType.set(type as TransportType);
     });
 
-    this.route.queryParamMap.subscribe((params) => {
-      const qStudentId = params.get('studentId');
-      if (qStudentId) {
-        const id = Number(qStudentId);
-        this.selectedStudentId.set(id);
-        this.subForm.patchValue({ studentId: id });
-      }
+    this.route.queryParamMap.subscribe(() => {
+      this.applyStudentParam(this.students());
     });
+  }
+
+  private loadStudentsForSession(): void {
+    this.isLoadingStudents.set(true);
+    this.studentService.fetchLiveStudents().subscribe((students) => {
+      this.isLoadingStudents.set(false);
+      this.applyStudentParam(students);
+    });
+  }
+
+  private applyStudentParam(studentsList: readonly StudentItem[]): void {
+    const qStudentId = this.route.snapshot.queryParamMap.get('studentId');
+    if (qStudentId) {
+      const id = Number(qStudentId);
+      const match = studentsList.find((s) => s.studentId === id);
+      if (match) {
+        this.selectedStudentId.set(match.studentId);
+        this.subForm.patchValue({ studentId: match.studentId });
+        return;
+      }
+    }
+    const currentId = this.selectedStudentId();
+    if (currentId > 0 && !studentsList.some((s) => s.studentId === currentId)) {
+      this.selectedStudentId.set(0);
+      this.subForm.patchValue({ studentId: 0 });
+    }
   }
 
   protected isFieldInvalid(fieldName: string): boolean {

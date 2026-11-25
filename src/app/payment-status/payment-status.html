@@ -251,7 +251,7 @@
                         </span>
 
                         <strong>
-                          {{ payment.subscription.startDate | date:'mediumDate' }}
+                          <bdi>{{ prefs.formatDate(payment.subscription.startDate) }}</bdi>
                         </strong>
                       </div>
 
@@ -261,7 +261,7 @@
                         </span>
 
                         <strong>
-                          {{ payment.subscription.endDate | date:'mediumDate' }}
+                          <bdi>{{ prefs.formatDate(payment.subscription.endDate) }}</bdi>
                         </strong>
                       </div>
                     </div>
@@ -282,7 +282,7 @@
 
                     <button
                       type="button"
-                      class="btn btn-outline view-details-btn"
+                      class="btn btn-secondary view-details-btn"
                       (click)="viewPaymentDetails(payment)"
                     >
                       {{ prefs.lang() === 'ar' ? 'عرض التفاصيل' : 'View Details' }}
@@ -384,9 +384,9 @@
                   @if (hasPeriodDates(payment.subscription)) {
                     <p>
                       <strong>{{ prefs.lang() === 'ar' ? 'الفترة:' : 'Subscription Period:' }}</strong>
-                      {{ payment.subscription.startDate | date:'mediumDate' }}
+                      <bdi>{{ prefs.formatDate(payment.subscription.startDate) }}</bdi>
                       -
-                      {{ payment.subscription.endDate | date:'mediumDate' }}
+                      <bdi>{{ prefs.formatDate(payment.subscription.endDate) }}</bdi>
                     </p>
                   }
 
@@ -398,7 +398,7 @@
                   @if (payment.paymentDate) {
                     <p>
                       <strong>{{ prefs.lang() === 'ar' ? 'تاريخ الدفع:' : 'Payment Date:' }}</strong>
-                      {{ payment.paymentDate | date:'mediumDate' }}
+                      <bdi>{{ prefs.formatDate(payment.paymentDate) }}</bdi>
                     </p>
                   }
 

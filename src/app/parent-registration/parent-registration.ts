@@ -14,6 +14,22 @@ import { PreferencesService } from '../services/preferences.service';
 
 import { Header } from '../header/header';
 
+export function nonBlankValidator(minLength: number, requireLetter = false) {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const value = typeof control.value === 'string' ? control.value.trim() : '';
+    if (!value) {
+      return { required: true };
+    }
+    if (value.length < minLength) {
+      return { minlength: { requiredLength: minLength, actualLength: value.length } };
+    }
+    if (requireLetter && !/\p{L}/u.test(value)) {
+      return { invalidText: true };
+    }
+    return null;
+  };
+}
+
 export function jordanianPhoneValidator(control: AbstractControl): ValidationErrors | null {
   if (!control.value) {
     return null;
@@ -55,14 +71,13 @@ export class ParentRegistration {
 
   protected readonly registerForm = this.fb.group(
     {
-      fullName: ['', [Validators.required, Validators.minLength(3)]],
+      fullName: ['', [nonBlankValidator(3, true)]],
       email: ['', [Validators.required, Validators.email, Validators.pattern(STRICT_EMAIL_PATTERN)]],
       phone: ['', [Validators.required, jordanianPhoneValidator]],
-      address: ['', [Validators.required, Validators.minLength(5)]],
-      password: ['', [Validators.required, Validators.minLength(8)]],
-      confirmPassword: ['', [Validators.required]],
+      address: ['', [nonBlankValidator(5, true)]],
+      password: ['', [nonBlankValidator(8)]],
+      confirmPassword: ['', [nonBlankValidator(1)]],
       canManageChildrenTransport: [true],
-      initialChildName: [''],
     },
     {
       validators: [passwordMatchValidator],
@@ -95,25 +110,28 @@ export class ParentRegistration {
     this.isSubmitting.set(true);
 
     const formValues = this.registerForm.getRawValue();
+    const fullName = formValues.fullName.trim();
+    const email = formValues.email.trim();
+    const phone = formValues.phone.trim();
+    const address = formValues.address.trim();
 
     this.authService
       .register({
-        fullName: formValues.fullName,
-        email: formValues.email,
-        phone: formValues.phone,
-        address: formValues.address,
+        fullName,
+        email,
+        phone,
+        address,
         password: formValues.password,
       })
       .subscribe({
         next: () => {
           this.registrationService.registerParent({
-            fullName: formValues.fullName,
-            email: formValues.email,
-            phone: formValues.phone,
-            address: formValues.address,
+            fullName,
+            email,
+            phone,
+            address,
             password: formValues.password,
             canManageChildrenTransport: formValues.canManageChildrenTransport,
-            initialChildName: formValues.initialChildName,
           });
 
           this.isSubmitting.set(false);

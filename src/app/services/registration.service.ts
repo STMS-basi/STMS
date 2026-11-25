@@ -25,7 +25,6 @@ export interface RegisterParentPayload {
   readonly address: string;
   readonly password: string;
   readonly canManageChildrenTransport?: boolean;
-  readonly initialChildName?: string;
 }
 
 const STORAGE_KEY = 'stms_registered_parents';
@@ -74,9 +73,7 @@ export class RegistrationService {
       address: payload.address.trim(),
       password: payload.password,
       canManageChildrenTransport: payload.canManageChildrenTransport ?? true,
-      children: payload.initialChildName?.trim()
-        ? [{ studentName: payload.initialChildName.trim() }]
-        : [],
+      children: [],
       registeredAt: new Date().toISOString(),
     };
 

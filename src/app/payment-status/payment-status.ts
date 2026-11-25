@@ -1,5 +1,4 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Header } from '../header/header';
 import { AuthService } from '../services/auth.service';
@@ -24,7 +23,7 @@ export interface PaymentRecord {
 
 @Component({
   selector: 'app-payment-status',
-  imports: [Header, RouterLink, DatePipe],
+  imports: [Header, RouterLink],
   templateUrl: './payment-status.html',
   styleUrl: './payment-status.css',
 })

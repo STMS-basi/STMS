@@ -92,12 +92,6 @@
   color: var(--text-main);
 }
 
-.form-label-subtle {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
 .form-input {
   width: 100%;
   padding: 0.65rem 0.85rem;
@@ -161,14 +155,6 @@
   font-weight: 600;
   color: var(--text-main);
   line-height: 1.4;
-}
-
-.child-quick-add {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding-top: 0.5rem;
-  border-top: 1px dashed var(--primary);
 }
 
 .form-actions {

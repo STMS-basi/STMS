@@ -43,6 +43,33 @@ describe('ParentRegistration', () => {
     expect(component['registerForm'].valid).toBe(false);
   });
 
+  it('should reject whitespace-only or non-letter values in Full Name and show validation error', () => {
+    const fixture = TestBed.createComponent(ParentRegistration);
+    const component = fixture.componentInstance;
+    const fullNameControl = component['registerForm'].get('fullName');
+
+    fullNameControl?.setValue('     ');
+    expect(fullNameControl?.valid).toBe(false);
+
+    component['onSubmit']();
+    fixture.detectChanges();
+
+    expect(component['isFieldInvalid']('fullName')).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain(component['t']().fullNameError);
+
+    fullNameControl?.setValue('  ab ');
+    expect(fullNameControl?.valid).toBe(false);
+
+    fullNameControl?.setValue('12345');
+    expect(fullNameControl?.valid).toBe(false);
+
+    fullNameControl?.setValue('Ahmad Ali');
+    expect(fullNameControl?.valid).toBe(true);
+
+    fullNameControl?.setValue('أحمد علي');
+    expect(fullNameControl?.valid).toBe(true);
+  });
+
   it('should validate email format strictly', () => {
     const fixture = TestBed.createComponent(ParentRegistration);
     const component = fixture.componentInstance;
@@ -66,8 +93,30 @@ describe('ParentRegistration', () => {
     passwordControl?.setValue('1234567');
     expect(passwordControl?.valid).toBe(false);
 
+    passwordControl?.setValue('        ');
+    expect(passwordControl?.valid).toBe(false);
+
     passwordControl?.setValue('12345678');
     expect(passwordControl?.valid).toBe(true);
+  });
+
+  it('should reject whitespace-only or non-letter address and whitespace-only confirmPassword', () => {
+    const fixture = TestBed.createComponent(ParentRegistration);
+    const component = fixture.componentInstance;
+    const addressControl = component['registerForm'].get('address');
+    const confirmControl = component['registerForm'].get('confirmPassword');
+
+    addressControl?.setValue('     ');
+    expect(addressControl?.valid).toBe(false);
+
+    addressControl?.setValue('12345');
+    expect(addressControl?.valid).toBe(false);
+
+    addressControl?.setValue('Abdoun, Amman');
+    expect(addressControl?.valid).toBe(true);
+
+    confirmControl?.setValue('        ');
+    expect(confirmControl?.valid).toBe(false);
   });
 
   it('should validate password confirmation matching', () => {
@@ -125,7 +174,6 @@ describe('ParentRegistration', () => {
       password: 'password123',
       confirmPassword: 'password123',
       canManageChildrenTransport: true,
-      initialChildName: '',
     });
 
     component['onSubmit']();
@@ -149,7 +197,6 @@ describe('ParentRegistration', () => {
       password: 'password123',
       confirmPassword: 'password123',
       canManageChildrenTransport: true,
-      initialChildName: '',
     });
 
     component['onSubmit']();
@@ -173,7 +220,6 @@ describe('ParentRegistration', () => {
       password: 'secretPassword123',
       confirmPassword: 'secretPassword123',
       canManageChildrenTransport: true,
-      initialChildName: 'Test Student',
     });
 
     component['onSubmit']();

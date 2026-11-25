@@ -36,10 +36,27 @@
   color: #fecaca;
 }
 
+.banner-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.65rem;
+}
+
 .banner-notes {
-  margin-left: 0.5rem;
-  opacity: 0.85;
-  font-size: 0.85rem;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  opacity: 0.9;
+  font-size: 0.88rem;
+}
+
+.banner-date-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  unicode-bidi: isolate;
 }
 
 .warning-card {

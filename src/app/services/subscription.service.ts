@@ -27,6 +27,13 @@ export interface SubscriptionItem {
   readonly endDate: string;
   readonly requestedAt: string;
   readonly parentEmail?: string;
+  readonly busId?: number | null;
+  readonly busPlate?: string | null;
+  readonly assignedBus?: string | null;
+  readonly driverId?: number | null;
+  readonly driverName?: string | null;
+  readonly assignedDriver?: string | null;
+  readonly direction?: string | null;
 }
 
 export interface CreateSubscriptionPayload {
@@ -60,6 +67,9 @@ export interface RegistrationInfo {
   readonly startDate: string;
   readonly endDate: string;
   readonly registrationOpenDate: string;
+  readonly rawStartDate?: string;
+  readonly rawEndDate?: string;
+  readonly rawRegistrationOpenDate?: string;
   readonly registrationOpen: boolean;
   readonly isRegistrationOpen: boolean;
   readonly message?: string;
@@ -69,11 +79,20 @@ export interface RegistrationInfo {
 interface RegistrationInfoRaw {
   readonly registrationOpen?: boolean | string | number;
   readonly isRegistrationOpen?: boolean | string | number;
+  readonly RegistrationOpen?: boolean | string | number;
+  readonly IsRegistrationOpen?: boolean | string | number;
+  readonly isOpen?: boolean | string | number;
+  readonly IsOpen?: boolean | string | number;
   readonly semesterName?: string;
+  readonly SemesterName?: string;
   readonly startDate?: string;
+  readonly StartDate?: string;
   readonly endDate?: string;
+  readonly EndDate?: string;
   readonly registrationOpenDate?: string;
+  readonly RegistrationOpenDate?: string;
   readonly message?: string;
+  readonly Message?: string;
 }
 
 const STORAGE_SUBSCRIPTIONS_KEY = 'stms_subscriptions';
@@ -155,6 +174,13 @@ export class SubscriptionService {
         return items.map((raw: any): SubscriptionItem => {
           const routeId = Number(raw.routeId ?? raw.route?.routeId ?? 0);
           const matchedRoute = routeId > 0 ? this.routeService.findLiveRouteById(routeId) : undefined;
+          const stopId = Number(raw.stopId ?? raw.stop?.stopId ?? 0);
+          const stopName = String(raw.stopName ?? raw.stop?.name ?? '').trim();
+          const matchedStop = matchedRoute?.stops?.find(
+            (st) =>
+              (stopId > 0 && st.stopId === stopId) ||
+              (stopName && st.name.trim().toLowerCase() === stopName.toLowerCase())
+          );
           const rawNum = String(raw.routeNumber ?? raw.route?.routeNumber ?? '').trim();
           const cleanNum = rawNum && rawNum !== '-' && rawNum !== '—' ? rawNum : matchedRoute?.routeNumber ?? '';
           const rawName = String(
@@ -172,10 +198,16 @@ export class SubscriptionService {
             routeId,
             routeNumber: cleanNum,
             routeName: rawName,
-            stopId: Number(raw.stopId ?? 0),
-            stopName: String(raw.stopName ?? raw.stop?.name ?? ''),
-            pickupTime: String(raw.pickupTime ?? raw.pickUpTime ?? raw.stop?.pickupTime ?? ''),
-            dropoffTime: String(raw.dropoffTime ?? raw.dropOffTime ?? raw.stop?.dropoffTime ?? ''),
+            stopId,
+            stopName,
+            pickupTime: String(
+              raw.pickupTime ?? raw.pickUpTime ?? raw.stop?.pickupTime ?? raw.stop?.pickUpTime ?? matchedStop?.pickupTime ?? ''
+            ),
+            dropoffTime: String(
+              raw.dropoffTime ?? raw.dropOffTime ?? raw.stop?.dropoffTime ?? raw.stop?.dropOffTime ?? matchedStop?.dropoffTime ?? ''
+            ),
+            direction:
+              String(raw.direction ?? raw.oneWayDirection ?? raw.tripDirection ?? '').trim() || null,
             transportType: (raw.transportType === 'OneWay' ? 'OneWay' : 'RoundTrip') as TransportType,
             fee: Number(raw.fee ?? (raw.transportType === 'OneWay' ? 150 : 300)),
             status: (raw.status ?? 'Pending') as SubscriptionStatus,
@@ -183,6 +215,38 @@ export class SubscriptionService {
             endDate: String(raw.endDate ?? '2026-12-31'),
             requestedAt: String(raw.requestedAt ?? raw.createdAt ?? new Date().toISOString()),
             parentEmail: String(raw.parentEmail || email).toLowerCase(),
+            busId:
+              Number(raw.busId ?? raw.route?.busId ?? matchedRoute?.busId ?? 0) || null,
+            busPlate:
+              String(
+                raw.busPlate ??
+                  raw.plateNumber ??
+                  raw.assignedBus ??
+                  raw.bus?.plateNumber ??
+                  raw.bus?.busPlate ??
+                  raw.route?.busPlate ??
+                  raw.route?.bus?.plateNumber ??
+                  matchedRoute?.busPlate ??
+                  matchedRoute?.assignedBus ??
+                  matchedRoute?.bus?.plateNumber ??
+                  ''
+              ).trim() || null,
+            driverId:
+              Number(raw.driverId ?? raw.route?.driverId ?? matchedRoute?.driverId ?? 0) || null,
+            driverName:
+              String(
+                raw.driverName ??
+                  raw.assignedDriver ??
+                  (typeof raw.driver === 'string' ? raw.driver : raw.driver?.fullName ?? raw.driver?.name) ??
+                  raw.route?.driverName ??
+                  raw.route?.driver?.fullName ??
+                  matchedRoute?.driverName ??
+                  matchedRoute?.assignedDriver ??
+                  (typeof matchedRoute?.driver === 'string'
+                    ? matchedRoute.driver
+                    : matchedRoute?.driver?.fullName ?? matchedRoute?.driver?.name) ??
+                  ''
+              ).trim() || null,
           };
         });
       }),
@@ -203,6 +267,9 @@ export class SubscriptionService {
           startDate: this.formatDate('2026-09-01'),
           endDate: this.formatDate('2026-12-31'),
           registrationOpenDate: this.formatDate('2026-08-18'),
+          rawStartDate: '2026-09-01',
+          rawEndDate: '2026-12-31',
+          rawRegistrationOpenDate: '2026-08-18',
           registrationOpen: true,
           isRegistrationOpen: true,
           message: 'Registration is open',
@@ -212,40 +279,75 @@ export class SubscriptionService {
   }
 
   private mapRegistrationInfo(raw: RegistrationInfoRaw): RegistrationInfo {
-    const rawVal = raw.registrationOpen ?? raw.isRegistrationOpen;
-    const isOpen = rawVal === true || rawVal === 'true' || rawVal === 1;
+    const rawVal =
+      raw.registrationOpen ??
+      raw.isRegistrationOpen ??
+      raw.RegistrationOpen ??
+      raw.IsRegistrationOpen ??
+      raw.isOpen ??
+      raw.IsOpen;
+    const isOpen = rawVal === true || rawVal === 'true' || rawVal === 1 || rawVal === '1';
 
-    let openDateStr = '';
-    if (raw.registrationOpenDate) {
-      openDateStr = this.formatDate(raw.registrationOpenDate);
-    } else if (raw.startDate) {
-      try {
-        const d = new Date(raw.startDate);
-        if (!isNaN(d.getTime())) {
-          d.setDate(d.getDate() - 14);
-          openDateStr = this.formatDate(d.toISOString());
-        }
-      } catch {
-        openDateStr = '';
+    const rawStartInput = raw.startDate ?? raw.StartDate ?? '';
+    const rawEndInput = raw.endDate ?? raw.EndDate ?? '';
+    const rawOpenInput = raw.registrationOpenDate ?? raw.RegistrationOpenDate ?? '';
+
+    const rawStartIso = this.toIsoDateString(rawStartInput);
+    const rawEndIso = this.toIsoDateString(rawEndInput);
+    let rawOpenIso = this.toIsoDateString(rawOpenInput);
+
+    if (!rawOpenIso && rawStartIso) {
+      const startParsed = this.parseCalendarDate(rawStartIso);
+      if (startParsed) {
+        startParsed.setDate(startParsed.getDate() - 14);
+        rawOpenIso = this.toIsoDateFromDate(startParsed);
       }
     }
 
     return {
-      semesterName: raw.semesterName ?? 'First Semester 2026/2027',
-      startDate: this.formatDate(raw.startDate ?? ''),
-      endDate: this.formatDate(raw.endDate ?? ''),
-      registrationOpenDate: openDateStr,
+      semesterName: raw.semesterName ?? raw.SemesterName ?? 'First Semester 2026/2027',
+      startDate: this.formatDate(rawStartIso || rawStartInput),
+      endDate: this.formatDate(rawEndIso || rawEndInput),
+      registrationOpenDate: this.formatDate(rawOpenIso || rawOpenInput),
+      rawStartDate: rawStartIso || undefined,
+      rawEndDate: rawEndIso || undefined,
+      rawRegistrationOpenDate: rawOpenIso || undefined,
       registrationOpen: isOpen,
       isRegistrationOpen: isOpen,
-      message: raw.message,
+      message: raw.message ?? raw.Message,
     };
+  }
+
+  private parseCalendarDate(dateStr: string): Date | null {
+    if (!dateStr) return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr.trim());
+    if (match) {
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      const day = Number(match[3]);
+      return new Date(year, month - 1, day);
+    }
+    const parsed = new Date(dateStr);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private toIsoDateString(dateStr: string): string {
+    const parsed = this.parseCalendarDate(dateStr);
+    return parsed ? this.toIsoDateFromDate(parsed) : '';
+  }
+
+  private toIsoDateFromDate(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 
   private formatDate(dateStr: string): string {
     if (!dateStr) return '';
     try {
-      const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return dateStr;
+      const date = this.parseCalendarDate(dateStr);
+      if (!date) return dateStr;
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',

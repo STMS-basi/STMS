@@ -24,27 +24,6 @@ export interface CreateStudentPayload {
 
 const LOCAL_STUDENTS_KEY = 'stms_parent_students';
 
-const INITIAL_DEMO_STUDENTS: readonly StudentItem[] = [
-  {
-    studentId: 101,
-    parentEmail: 'parent@stms.edu',
-    fullName: 'Yousef Al Basi',
-    grade: 'Grade 5',
-    className: '5A',
-    dateOfBirth: '2015-04-12',
-    notes: 'Supervised pickup stop requested',
-  },
-  {
-    studentId: 102,
-    parentEmail: 'parent@stms.edu',
-    fullName: 'Layan Al Basi',
-    grade: 'Grade 2',
-    className: '2B',
-    dateOfBirth: '2018-09-20',
-    notes: 'Prefers front seats near bus supervisor',
-  },
-];
-
 @Injectable({
   providedIn: 'root',
 })
@@ -68,22 +47,46 @@ export class StudentService {
     });
   }
 
+  public clearInMemoryStudents(): void {
+    this.studentsSignal.set([]);
+  }
+
   public getParentEmail(): string {
-    return this.authService.userEmail()?.trim().toLowerCase() || 'parent@stms.edu';
+    return this.authService.userEmail()?.trim().toLowerCase() || 'guest';
   }
 
   private getStorageKey(): string {
     return `${LOCAL_STUDENTS_KEY}_${this.getParentEmail()}`;
   }
 
+  private isLegacyDemoStudent(student: StudentItem): boolean {
+    return (
+      (student.studentId === 101 && student.fullName === 'Yousef Al Basi') ||
+      (student.studentId === 102 && student.fullName === 'Layan Al Basi')
+    );
+  }
+
   private loadStoredStudents(): StudentItem[] {
+    if (!this.authService.isAuthenticated()) {
+      return [];
+    }
+
+    const currentEmail = this.authService.userEmail()?.trim().toLowerCase();
+    if (!currentEmail) {
+      return [];
+    }
+
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         const stored = localStorage.getItem(this.getStorageKey());
         if (stored) {
           const parsed = JSON.parse(stored) as StudentItem[];
           if (Array.isArray(parsed)) {
-            return parsed;
+            return parsed.filter(
+              (s) =>
+                !this.isLegacyDemoStudent(s) &&
+                s.parentEmail?.trim().toLowerCase() === currentEmail
+            );
           }
         }
       }
@@ -91,15 +94,7 @@ export class StudentService {
       // Ignore storage read errors
     }
 
-    if (this.authService.isAuthenticated()) {
-      return [];
-    }
-
-    // Return sample mock students only when unauthenticated (e.g. standalone UI tests)
-    return INITIAL_DEMO_STUDENTS.map((s) => ({
-      ...s,
-      parentEmail: this.getParentEmail(),
-    }));
+    return [];
   }
 
   private persistStoredStudents(items: StudentItem[]): void {
@@ -129,6 +124,34 @@ export class StudentService {
         }
       }),
       catchError(() => of(currentLocal))
+    );
+  }
+
+  /** Fetch strictly from GET /api/students for the authenticated user without reading localStorage fallback. */
+  public fetchLiveStudents(): Observable<StudentItem[]> {
+    if (!this.authService.isAuthenticated()) {
+      this.studentsSignal.set([]);
+      return of([]);
+    }
+
+    this.studentsSignal.set([]);
+    const parentEmail = this.getParentEmail();
+
+    return this.http.get<StudentItem[]>('/api/students').pipe(
+      tap((students) => {
+        const scoped = Array.isArray(students)
+          ? students.map((s) => ({
+              ...s,
+              parentEmail: (s.parentEmail || parentEmail).toLowerCase(),
+            }))
+          : [];
+        this.studentsSignal.set(scoped);
+        this.persistStoredStudents(scoped);
+      }),
+      catchError(() => {
+        this.studentsSignal.set([]);
+        return of([]);
+      })
     );
   }
 

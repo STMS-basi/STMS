@@ -78,7 +78,7 @@
                 </div>
                 <div class="detail-row">
                   <span class="detail-name">{{ t().requestedAtLabel }}</span>
-                  <span class="detail-val">{{ sub.requestedAt | date: 'mediumDate' }}</span>
+                  <span class="detail-val"><bdi>{{ prefs.formatDate(sub.requestedAt) }}</bdi></span>
                 </div>
               </div>
             </div>
