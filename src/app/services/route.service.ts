@@ -102,6 +102,8 @@ export class RouteService {
 
   private readonly routesSignal = signal<readonly RouteItem[]>(DEFAULT_ROUTES);
   public readonly routes = this.routesSignal.asReadonly();
+  private readonly hasBackendRoutesSignal = signal(false);
+  public readonly hasBackendRoutes = this.hasBackendRoutesSignal.asReadonly();
 
   // Get all routes, with optional search and area filters
   getRoutes(search?: string, area?: string): Observable<RouteItem[]> {
@@ -115,7 +117,16 @@ export class RouteService {
       params = params.set('area', area);
     }
 
-    return this.http.get<RouteItem[]>('/api/routes', { params });
+    return this.http.get<RouteItem[]>('/api/routes', { params }).pipe(
+      tap((routes) => {
+        if (Array.isArray(routes)) {
+          this.hasBackendRoutesSignal.set(true);
+          if (!search && (!area || area === 'All')) {
+            this.routesSignal.set(routes);
+          }
+        }
+      })
+    );
   }
 
   // Get available service areas
@@ -139,12 +150,19 @@ export class RouteService {
   fetchRoutes(): Observable<readonly RouteItem[]> {
     return this.getRoutes().pipe(
       tap((routes) => {
-        if (routes && routes.length > 0) {
+        if (Array.isArray(routes)) {
+          this.hasBackendRoutesSignal.set(true);
           this.routesSignal.set(routes);
         }
       }),
       catchError(() => of(this.routesSignal()))
     );
+  }
+
+  // Find a route by its ID (only from real backend data when loaded)
+  findLiveRouteById(routeId: number): RouteItem | undefined {
+    if (!this.hasBackendRoutesSignal()) return undefined;
+    return this.routesSignal().find((route) => route.routeId === routeId);
   }
 
   // Find a route by its ID

@@ -131,7 +131,10 @@
 
             <div class="payment-records">
 
-              @for (payment of payments(); track payment.subscription.subscriptionId) {
+              @for (
+                payment of payments();
+                track (payment.paymentId ? 'pay-' + payment.paymentId : 'sub-' + payment.subscription.subscriptionId + '-' + $index)
+              ) {
                 <article class="payment-card card">
 
                   <div class="payment-card-header">
@@ -148,8 +151,9 @@
                     <span
                       class="payment-status"
                       [class.status-paid]="payment.paymentStatus === 'Paid'"
-                      [class.status-unpaid]="payment.paymentStatus === 'Unpaid'"
+                      [class.status-unpaid]="payment.paymentStatus === 'Unpaid' || payment.paymentStatus === 'Partial'"
                       [class.status-pending]="payment.paymentStatus === 'Pending Approval'"
+                      [class.status-rejected]="payment.paymentStatus === 'Rejected'"
                     >
                       {{ paymentStatusText(payment) }}
                     </span>
@@ -170,75 +174,115 @@
                       </span>
 
                       <strong>
-                        {{ payment.subscription.routeNumber }} - {{ payment.subscription.routeName }}
+                        {{ formatRouteLabel(payment.subscription) }}
                       </strong>
                     </div>
                   </div>
 
                   <div class="payment-amounts">
 
-                    <div class="amount-item">
-                      <span>
-                        {{ prefs.lang() === 'ar' ? 'المبلغ المستحق' : 'Amount Due' }}
-                      </span>
+                    @if (payment.isPayable) {
+                      <div class="amount-item">
+                        <span>
+                          {{ prefs.lang() === 'ar' ? 'المبلغ المستحق' : 'Amount Due' }}
+                        </span>
 
-                      <strong>{{ payment.amountDue }} JOD</strong>
-                    </div>
+                        <strong>{{ payment.amountDue }} JOD</strong>
+                      </div>
 
-                    <div class="amount-item">
-                      <span>
-                        {{ prefs.lang() === 'ar' ? 'المبلغ المدفوع المسجل' : 'Recorded Amount Paid' }}
-                      </span>
+                      <div class="amount-item">
+                        <span>
+                          {{ prefs.lang() === 'ar' ? 'المبلغ المدفوع المسجل' : 'Recorded Amount Paid' }}
+                        </span>
 
-                      <strong class="paid-amount">
-                        {{ payment.amountPaid }} JOD
-                      </strong>
-                    </div>
+                        <strong class="paid-amount">
+                          {{ payment.amountPaid }} JOD
+                        </strong>
+                      </div>
 
-                    <div class="amount-item">
-                      <span>
-                        {{ prefs.lang() === 'ar' ? 'الرصيد المستحق' : 'Outstanding Balance' }}
-                      </span>
+                      <div class="amount-item">
+                        <span>
+                          {{ prefs.lang() === 'ar' ? 'الرصيد المستحق' : 'Outstanding Balance' }}
+                        </span>
 
-                      <strong class="balance-amount">
-                        {{ payment.outstandingBalance }} JOD
-                      </strong>
-                    </div>
+                        <strong class="balance-amount">
+                          {{ payment.outstandingBalance }} JOD
+                        </strong>
+                      </div>
+                    } @else {
+                      <div class="amount-item">
+                        <span>
+                          {{ prefs.lang() === 'ar' ? 'الرسوم المتوقعة للفصل' : 'Estimated Semester Fee' }}
+                        </span>
+
+                        <strong>{{ payment.subscriptionFee }} JOD</strong>
+                      </div>
+
+                      <div class="amount-item">
+                        <span>
+                          {{ prefs.lang() === 'ar' ? 'المبلغ المطلوب حالياً' : 'Payable Now' }}
+                        </span>
+
+                        <strong class="paid-amount">0 JOD</strong>
+                      </div>
+
+                      <div class="amount-item">
+                        <span>
+                          {{ prefs.lang() === 'ar' ? 'إتاحة الدفع' : 'Payment Availability' }}
+                        </span>
+
+                        <strong class="pending-note">
+                          {{
+                            payment.paymentStatus === 'Rejected'
+                              ? (prefs.lang() === 'ar' ? 'غير متاح (طلب مرفوض)' : 'Unavailable (Rejected)')
+                              : (prefs.lang() === 'ar' ? 'بعد موافقة الإدارة' : 'After Admin Approval')
+                          }}
+                        </strong>
+                      </div>
+                    }
 
                   </div>
 
-                  <div class="period-info">
-                    <div>
-                      <span class="record-label">
-                        {{ prefs.lang() === 'ar' ? 'بداية الفترة' : 'Period Start' }}
-                      </span>
+                  @if (hasPeriodDates(payment.subscription)) {
+                    <div class="period-info">
+                      <div>
+                        <span class="record-label">
+                          {{ prefs.lang() === 'ar' ? 'بداية الفترة' : 'Period Start' }}
+                        </span>
 
-                      <strong>
-                        {{ payment.subscription.startDate | date:'mediumDate' }}
-                      </strong>
+                        <strong>
+                          {{ payment.subscription.startDate | date:'mediumDate' }}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span class="record-label">
+                          {{ prefs.lang() === 'ar' ? 'نهاية الفترة' : 'Period End' }}
+                        </span>
+
+                        <strong>
+                          {{ payment.subscription.endDate | date:'mediumDate' }}
+                        </strong>
+                      </div>
                     </div>
-
-                    <div>
-                      <span class="record-label">
-                        {{ prefs.lang() === 'ar' ? 'نهاية الفترة' : 'Period End' }}
-                      </span>
-
-                      <strong>
-                        {{ payment.subscription.endDate | date:'mediumDate' }}
-                      </strong>
-                    </div>
-                  </div>
+                  }
 
                   <div class="payment-card-footer">
                     <span class="administration-label">
-                      {{ prefs.lang() === 'ar'
-                        ? 'يتم تحديث حالة الدفع من قبل الإدارة'
-                        : 'Payment status updated by administration' }}
+                      {{
+                        payment.paymentStatus === 'Pending Approval'
+                          ? (prefs.lang() === 'ar'
+                              ? 'لا يتاح الدفع قبل الموافقة المبدئية من الإدارة'
+                              : 'Payment opens after administration preliminary approval')
+                          : (prefs.lang() === 'ar'
+                              ? 'يتم تحديث حالة الدفع من قبل الإدارة'
+                              : 'Payment status updated by administration')
+                      }}
                     </span>
 
                     <button
                       type="button"
-                      class="btn btn-outline"
+                      class="btn btn-outline view-details-btn"
                       (click)="viewPaymentDetails(payment)"
                     >
                       {{ prefs.lang() === 'ar' ? 'عرض التفاصيل' : 'View Details' }}
@@ -258,17 +302,19 @@
                 class="payment-modal card"
                 role="dialog"
                 aria-modal="true"
+                aria-labelledby="payment-modal-title"
                 (click)="$event.stopPropagation()"
               >
 
                 <div class="modal-header">
-                  <h2>
-                    {{ prefs.lang() === 'ar' ? 'تفاصيل الدفع' : 'Payment Details' }}
+                  <h2 id="payment-modal-title">
+                    {{ prefs.lang() === 'ar' ? 'تفاصيل الدفع والاشتراك' : 'Payment & Subscription Details' }}
                   </h2>
 
                   <button
                     type="button"
                     class="close-button"
+                    [attr.aria-label]="prefs.lang() === 'ar' ? 'إغلاق' : 'Close'"
                     (click)="closePaymentDetails()"
                   >
                     ×
@@ -288,31 +334,67 @@
                   </p>
 
                   <p>
-                    <strong>{{ prefs.lang() === 'ar' ? 'الرسوم المستحقة:' : 'Amount Due:' }}</strong>
-                    {{ payment.amountDue }} JOD
+                    <strong>{{ prefs.lang() === 'ar' ? 'المسار:' : 'Route:' }}</strong>
+                    {{ formatRouteLabel(payment.subscription) }}
                   </p>
 
-                  <p>
-                    <strong>{{ prefs.lang() === 'ar' ? 'المبلغ المدفوع المسجل:' : 'Recorded Amount Paid:' }}</strong>
-                    {{ payment.amountPaid }} JOD
-                  </p>
+                  @if (payment.subscription.stopName) {
+                    <p>
+                      <strong>{{ prefs.lang() === 'ar' ? 'نقطة الاصطحاب:' : 'Pickup Stop:' }}</strong>
+                      {{ payment.subscription.stopName }}
+                    </p>
+                  }
 
                   <p>
-                    <strong>{{ prefs.lang() === 'ar' ? 'الرصيد المستحق:' : 'Outstanding Balance:' }}</strong>
-                    {{ payment.outstandingBalance }} JOD
+                    <strong>{{ prefs.lang() === 'ar' ? 'نوع النقل:' : 'Transport Type:' }}</strong>
+                    {{
+                      payment.subscription.transportType === 'OneWay'
+                        ? (prefs.lang() === 'ar' ? 'اتجاه واحد' : 'One Way')
+                        : (prefs.lang() === 'ar' ? 'ذهاب وإياب' : 'Round Trip')
+                    }}
                   </p>
 
-                  <p>
-                    <strong>{{ prefs.lang() === 'ar' ? 'الفترة:' : 'Subscription Period:' }}</strong>
-                    {{ payment.subscription.startDate | date:'mediumDate' }}
-                    -
-                    {{ payment.subscription.endDate | date:'mediumDate' }}
-                  </p>
+                  @if (payment.isPayable) {
+                    <p>
+                      <strong>{{ prefs.lang() === 'ar' ? 'الرسوم المستحقة:' : 'Amount Due:' }}</strong>
+                      {{ payment.amountDue }} JOD
+                    </p>
+
+                    <p>
+                      <strong>{{ prefs.lang() === 'ar' ? 'المبلغ المدفوع المسجل:' : 'Recorded Amount Paid:' }}</strong>
+                      {{ payment.amountPaid }} JOD
+                    </p>
+
+                    <p>
+                      <strong>{{ prefs.lang() === 'ar' ? 'الرصيد المستحق:' : 'Outstanding Balance:' }}</strong>
+                      {{ payment.outstandingBalance }} JOD
+                    </p>
+                  } @else {
+                    <p>
+                      <strong>{{ prefs.lang() === 'ar' ? 'الرسوم المتوقعة للفصل:' : 'Estimated Semester Fee:' }}</strong>
+                      {{ payment.subscriptionFee }} JOD
+                    </p>
+
+                    <p>
+                      <strong>{{ prefs.lang() === 'ar' ? 'المبلغ المطلوب حالياً:' : 'Payable Now:' }}</strong>
+                      0 JOD
+                    </p>
+                  }
+
+                  @if (hasPeriodDates(payment.subscription)) {
+                    <p>
+                      <strong>{{ prefs.lang() === 'ar' ? 'الفترة:' : 'Subscription Period:' }}</strong>
+                      {{ payment.subscription.startDate | date:'mediumDate' }}
+                      -
+                      {{ payment.subscription.endDate | date:'mediumDate' }}
+                    </p>
+                  }
 
                   <p>
                     <strong>{{ prefs.lang() === 'ar' ? 'حالة الدفع:' : 'Payment Status:' }}</strong>
                     {{ paymentStatusText(payment) }}
                   </p>
+
                   @if (payment.paymentDate) {
                     <p>
                       <strong>{{ prefs.lang() === 'ar' ? 'تاريخ الدفع:' : 'Payment Date:' }}</strong>
@@ -320,10 +402,23 @@
                     </p>
                   }
 
+                  @if (payment.notes) {
+                    <p>
+                      <strong>{{ prefs.lang() === 'ar' ? 'ملاحظات:' : 'Notes:' }}</strong>
+                      {{ payment.notes }}
+                    </p>
+                  }
+
                   <div class="modal-notice">
-                    {{ prefs.lang() === 'ar'
-                      ? 'يرجى التواصل مع إدارة المدرسة لتأكيد المدفوعات وتحديث السجلات.'
-                      : 'Please contact the school administration to confirm payments and update the records.' }}
+                    {{
+                      payment.paymentStatus === 'Pending Approval'
+                        ? (prefs.lang() === 'ar'
+                            ? 'هذا الطلب بانتظار موافقة إدارة المدرسة المبدئية. لا يمكن سداد الرسوم إلا بعد اعتماد الطلب مبدئياً.'
+                            : 'This request is awaiting administration preliminary approval. Fees become payable only after approval.')
+                        : (prefs.lang() === 'ar'
+                            ? 'يرجى التواصل مع إدارة المدرسة لتأكيد المدفوعات وتحديث السجلات.'
+                            : 'Please contact the school administration to confirm payments and update the records.')
+                    }}
                   </div>
 
                 </div>

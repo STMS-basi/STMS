@@ -1,10 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { AuthService } from './auth.service';
 import { BackendPaymentItem, PaymentService } from './payment.service';
 
 describe('PaymentService', () => {
   let service: PaymentService;
+  let authService: AuthService;
   let httpTesting: HttpTestingController;
 
   const mockPayments: BackendPaymentItem[] = [
@@ -28,6 +30,7 @@ describe('PaymentService', () => {
     });
 
     service = TestBed.inject(PaymentService);
+    authService = TestBed.inject(AuthService);
     httpTesting = TestBed.inject(HttpTestingController);
   });
 
@@ -84,5 +87,29 @@ describe('PaymentService', () => {
 
     const req = httpTesting.expectOne('/api/payments/my');
     req.error(new ProgressEvent('Network error'));
+  });
+
+  it('should isolate cached payment records by parent account', () => {
+    authService.setSession({
+      token: 'jwt-1',
+      role: 'Parent',
+      fullName: 'Parent One',
+      email: 'parent1@example.com',
+    });
+
+    service.fetchMyPayments().subscribe();
+    httpTesting.expectOne('/api/payments/my').flush(mockPayments);
+    expect(service.payments().length).toBe(1);
+
+    authService.setSession({
+      token: 'jwt-2',
+      role: 'Parent',
+      fullName: 'Parent Two',
+      email: 'parent2@example.com',
+    });
+
+    service.fetchMyPayments().subscribe();
+    httpTesting.expectOne('/api/payments/my').flush([]);
+    expect(service.payments().length).toBe(0);
   });
 });

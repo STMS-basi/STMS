@@ -68,12 +68,7 @@ export class Transport {
     'Choose either the morning pickup or the afternoon drop-off if your child only needs one direction.':
       'اختر الاصطحاب صباحاً أو التوصيل بعد الظهر إذا كان طفلك يحتاج إلى اتجاه واحد فقط.',
 
-    'After School Activity Shuttle': 'حافلة أنشطة ما بعد المدرسة',
-
-    'Later afternoon departures for students joining clubs, sports training, and extracurricular programs.':
-      'رحلات بعد الظهر للطلاب المشاركين في النوادي والتدريبات الرياضية والأنشطة اللامنهجية.',
-
-    'JOD per month': 'دينار أردني شهرياً',
+    'JOD per semester': 'دينار أردني للفصل الدراسي',
 
     'North Amman': 'شمال عمّان',
     'West Amman': 'غرب عمّان',
@@ -95,17 +90,8 @@ export class Transport {
     'Direction (pickup or drop-off) is selected at subscription time.':
       'يتم تحديد الاتجاه (الاصطحاب أو التوصيل) عند الاشتراك.',
 
-    'Changing direction requires a modification request.':
-      'يتطلب تغيير الاتجاه تقديم طلب تعديل.',
-
-    'Available only on days with scheduled activities.':
-      'متاح فقط في الأيام التي توجد فيها أنشطة مجدولة.',
-
-    'Requires an active main transportation subscription.':
-      'يتطلب وجود اشتراك نقل أساسي فعال.',
-
-    'Pickup stop is the same as the main route.':
-      'محطة الاصطحاب هي نفسها محطة المسار الأساسي.',
+    'Changing direction requires submitting a request through the school transportation office.':
+      'يتطلب تغيير الاتجاه مراجعة مكتب النقل المدرسي.',
 
     'View Routes': 'عرض المسارات',
 
@@ -131,8 +117,8 @@ export class Transport {
 
     'Cancellation and Changes': 'الإلغاء والتعديلات',
 
-    'Cancellation or modification requests can be submitted from the My Transportation page according to school rules.':
-      'يمكن تقديم طلبات الإلغاء أو التعديل من صفحة نقلي وفقاً لأنظمة المدرسة.',
+    'For cancellation or route change inquiries, please contact the school transportation office according to school rules.':
+      'للاستفسار عن الإلغاء أو تعديل المسار، يرجى التواصل مع مكتب النقل المدرسي وفقاً لأنظمة المدرسة.',
 
     'Ready to Subscribe?': 'هل أنت مستعد للاشتراك؟',
 
@@ -171,8 +157,8 @@ export class Transport {
       title: 'Round-Trip Transportation',
       description:
         'Morning pickup from your stop and afternoon return home, with a reserved seat for the whole subscription period.',
-      fee: 40,
-      feeUnit: 'JOD per month',
+      fee: 300,
+      feeUnit: 'JOD per semester',
       serviceAreas: [
         'North Amman',
         'West Amman',
@@ -193,8 +179,8 @@ export class Transport {
       title: 'One-Way Transportation',
       description:
         'Choose either the morning pickup or the afternoon drop-off if your child only needs one direction.',
-      fee: 25,
-      feeUnit: 'JOD per month',
+      fee: 150,
+      feeUnit: 'JOD per semester',
       serviceAreas: [
         'North Amman',
         'West Amman',
@@ -202,33 +188,12 @@ export class Transport {
       ],
       conditions: [
         'Direction (pickup or drop-off) is selected at subscription time.',
-        'Changing direction requires a modification request.',
+        'Changing direction requires submitting a request through the school transportation office.',
         'Subject to seat availability on the chosen route.',
       ],
       iconSrc: 'watch.png',
       iconAlt: 'Schedule watch icon',
       width: 58,
-      height: 72,
-    },
-
-    {
-      title: 'After School Activity Shuttle',
-      description:
-        'Later afternoon departures for students joining clubs, sports training, and extracurricular programs.',
-      fee: 15,
-      feeUnit: 'JOD per month',
-      serviceAreas: [
-        'West Amman',
-        'Downtown',
-      ],
-      conditions: [
-        'Available only on days with scheduled activities.',
-        'Requires an active main transportation subscription.',
-        'Pickup stop is the same as the main route.',
-      ],
-      iconSrc: 'pin.png',
-      iconAlt: 'Location pin icon',
-      width: 60,
       height: 72,
     },
   ]);
@@ -254,7 +219,7 @@ export class Transport {
 
     {
       title: 'Cancellation and Changes',
-      text: 'Cancellation or modification requests can be submitted from the My Transportation page according to school rules.',
+      text: 'For cancellation or route change inquiries, please contact the school transportation office according to school rules.',
     },
   ]);
 

@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, effect, inject, signal, untracked } from '@angular/core';
 import { Observable, catchError, of, tap } from 'rxjs';
 import { AuthService } from './auth.service';
 
@@ -54,6 +54,19 @@ export class StudentService {
 
   private readonly studentsSignal = signal<StudentItem[]>(this.loadStoredStudents());
   public readonly students = this.studentsSignal.asReadonly();
+  private activeStorageKey = this.getStorageKey();
+
+  constructor() {
+    effect(() => {
+      const nextKey = this.getStorageKey();
+      if (nextKey !== this.activeStorageKey) {
+        this.activeStorageKey = nextKey;
+        untracked(() => {
+          this.studentsSignal.set(this.loadStoredStudents());
+        });
+      }
+    });
+  }
 
   public getParentEmail(): string {
     return this.authService.userEmail()?.trim().toLowerCase() || 'parent@stms.edu';
@@ -69,7 +82,7 @@ export class StudentService {
         const stored = localStorage.getItem(this.getStorageKey());
         if (stored) {
           const parsed = JSON.parse(stored) as StudentItem[];
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             return parsed;
           }
         }
@@ -77,7 +90,12 @@ export class StudentService {
     } catch {
       // Ignore storage read errors
     }
-    // Return sample mock students for immediate testing without backend
+
+    if (this.authService.isAuthenticated()) {
+      return [];
+    }
+
+    // Return sample mock students only when unauthenticated (e.g. standalone UI tests)
     return INITIAL_DEMO_STUDENTS.map((s) => ({
       ...s,
       parentEmail: this.getParentEmail(),
@@ -100,9 +118,14 @@ export class StudentService {
 
     return this.http.get<StudentItem[]>('/api/students').pipe(
       tap((students) => {
-        if (Array.isArray(students) && students.length > 0) {
-          this.studentsSignal.set(students);
-          this.persistStoredStudents(students);
+        if (Array.isArray(students)) {
+          const parentEmail = this.getParentEmail();
+          const scoped = students.map((s) => ({
+            ...s,
+            parentEmail: s.parentEmail || parentEmail,
+          }));
+          this.studentsSignal.set(scoped);
+          this.persistStoredStudents(scoped);
         }
       }),
       catchError(() => of(currentLocal))

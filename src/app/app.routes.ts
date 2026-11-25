@@ -80,6 +80,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./payment-status/payment-status').then((m) => m.PaymentStatus),
   },
+  {
+    path: 'access-denied',
+    loadComponent: () =>
+      import('./access-denied/access-denied').then((m) => m.AccessDenied),
+  },
 
   // Admin Dashboard protected by adminGuard
   {

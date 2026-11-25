@@ -1,7 +1,13 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { catchError, forkJoin, of } from 'rxjs';
 import { Header } from '../header/header';
 import { PreferencesService } from '../services/preferences.service';
+import {
+  RouteItem,
+  RouteService,
+  RouteStop as ServiceRouteStop,
+} from '../services/route.service';
 
 interface RouteStop {
   readonly name: string;
@@ -32,8 +38,9 @@ interface SchoolRoute {
   templateUrl: './routes.html',
   styleUrl: './routes.css',
 })
-export class Routes {
+export class Routes implements OnInit {
   protected readonly prefs = inject(PreferencesService);
+  private readonly routeService = inject(RouteService);
 
   protected readonly isArabic = computed(
     () => this.prefs.lang() === 'ar'
@@ -43,6 +50,9 @@ export class Routes {
   protected readonly searchTerm = signal('');
   protected readonly selectedArea = signal('All');
   protected readonly selectedRouteId = signal<number | null>(null);
+  protected readonly isLoading = signal(true);
+  protected readonly errorMessage = signal('');
+  protected readonly loadingDetailsId = signal<number | null>(null);
 
   private readonly arabicText: Record<string, string> = {
     // Hero
@@ -129,8 +139,17 @@ export class Routes {
     'Stops and Pickup / Drop-off Schedules':
       'المحطات وجداول الاصطحاب والتوصيل',
     'Stop': 'المحطة',
-    'These are demonstration schedules and capacity figures. Actual information should be confirmed with the transportation office.':
-      'هذه المواعيد وأرقام السعة تجريبية. يرجى التأكد من المعلومات الفعلية من مكتب النقل.',
+    'Loading routes...': 'جاري تحميل المسارات...',
+    'Loading route details...': 'جاري تحميل تفاصيل المسار...',
+    'Unable to load routes at the moment. Please try again.':
+      'تعذر تحميل المسارات حالياً. يرجى المحاولة مرة أخرى.',
+    'Retry': 'إعادة المحاولة',
+    'Click View Route Details to load stop schedules.':
+      'اضغط على عرض تفاصيل المسار لعرض المحطات والمواعيد.',
+    'No stop schedules available for this route yet.':
+      'لا توجد جداول محطات متاحة لهذا المسار حالياً.',
+    'No active routes are currently available.':
+      'لا توجد مسارات نشطة متاحة حالياً.',
 
     // Bus and driver
     'Assigned Bus and Driver': 'الحافلة والسائق المعيّنان',
@@ -176,236 +195,40 @@ export class Routes {
       : value;
   }
 
-  // Demonstration data.
-  // Replace these values with actual database information when available.
-  protected readonly routes = signal<readonly SchoolRoute[]>([
-    {
-      id: 1,
-      routeNumber: 'R101',
-      routeName: 'North Amman Route',
-      serviceArea: 'North Amman',
-      startingPoint: 'Abu Nseir',
-      destination: 'Basi School',
-      pickupTime: '6:45 AM',
-      dropoffTime: '2:45 PM',
-      assignedBus: null,
-      assignedDriver: null,
-      capacity: 30,
-      enrolledStudents: 24,
-      isActive: true,
-      stops: [
-        {
-          name: 'Abu Nseir Circle',
-          pickupTime: '6:45 AM',
-          dropoffTime: '2:45 PM',
-        },
-        {
-          name: 'Shafa Badran',
-          pickupTime: '6:55 AM',
-          dropoffTime: '2:35 PM',
-        },
-        {
-          name: 'University Street',
-          pickupTime: '7:10 AM',
-          dropoffTime: '2:20 PM',
-        },
-        {
-          name: 'Basi School',
-          pickupTime: '7:30 AM',
-          dropoffTime: '2:00 PM',
-        },
-      ],
-    },
-    {
-      id: 2,
-      routeNumber: 'R102',
-      routeName: 'West Amman Route',
-      serviceArea: 'West Amman',
-      startingPoint: 'Khalda',
-      destination: 'Basi School',
-      pickupTime: '6:50 AM',
-      dropoffTime: '2:40 PM',
-      assignedBus: null,
-      assignedDriver: null,
-      capacity: 30,
-      enrolledStudents: 25,
-      isActive: true,
-      stops: [
-        {
-          name: 'Khalda Circle',
-          pickupTime: '6:50 AM',
-          dropoffTime: '2:40 PM',
-        },
-        {
-          name: 'Tla Al-Ali',
-          pickupTime: '7:00 AM',
-          dropoffTime: '2:30 PM',
-        },
-        {
-          name: 'Dabouq',
-          pickupTime: '7:12 AM',
-          dropoffTime: '2:18 PM',
-        },
-        {
-          name: 'Basi School',
-          pickupTime: '7:30 AM',
-          dropoffTime: '2:00 PM',
-        },
-      ],
-    },
-    {
-      id: 3,
-      routeNumber: 'R103',
-      routeName: 'Downtown Route',
-      serviceArea: 'Downtown',
-      startingPoint: 'Ras Al-Ain',
-      destination: 'Basi School',
-      pickupTime: '6:40 AM',
-      dropoffTime: '2:50 PM',
-      assignedBus: null,
-      assignedDriver: null,
-      capacity: 30,
-      enrolledStudents: 22,
-      isActive: true,
-      stops: [
-        {
-          name: 'Ras Al-Ain',
-          pickupTime: '6:40 AM',
-          dropoffTime: '2:50 PM',
-        },
-        {
-          name: 'Downtown Amman',
-          pickupTime: '6:50 AM',
-          dropoffTime: '2:40 PM',
-        },
-        {
-          name: 'Jabal Amman',
-          pickupTime: '7:05 AM',
-          dropoffTime: '2:25 PM',
-        },
-        {
-          name: 'Basi School',
-          pickupTime: '7:30 AM',
-          dropoffTime: '2:00 PM',
-        },
-      ],
-    },
-    {
-      id: 4,
-      routeNumber: 'R104',
-      routeName: 'East Amman Route',
-      serviceArea: 'East Amman',
-      startingPoint: 'Marka',
-      destination: 'Basi School',
-      pickupTime: '6:40 AM',
-      dropoffTime: '2:45 PM',
-      assignedBus: null,
-      assignedDriver: null,
-      capacity: 30,
-      enrolledStudents: 28,
-      isActive: true,
-      stops: [
-        {
-          name: 'Marka',
-          pickupTime: '6:40 AM',
-          dropoffTime: '2:45 PM',
-        },
-        {
-          name: 'Prince Hamzah Hospital Area',
-          pickupTime: '6:55 AM',
-          dropoffTime: '2:30 PM',
-        },
-        {
-          name: 'Tabarbour',
-          pickupTime: '7:10 AM',
-          dropoffTime: '2:15 PM',
-        },
-        {
-          name: 'Basi School',
-          pickupTime: '7:30 AM',
-          dropoffTime: '2:00 PM',
-        },
-      ],
-    },
-    {
-      id: 5,
-      routeNumber: 'R105',
-      routeName: 'South Amman Route',
-      serviceArea: 'South Amman',
-      startingPoint: 'Naour',
-      destination: 'Basi School',
-      pickupTime: '6:35 AM',
-      dropoffTime: '2:50 PM',
-      assignedBus: null,
-      assignedDriver: null,
-      capacity: 30,
-      enrolledStudents: 26,
-      isActive: true,
-      stops: [
-        {
-          name: 'Naour',
-          pickupTime: '6:35 AM',
-          dropoffTime: '2:50 PM',
-        },
-        {
-          name: 'Marj Al-Hamam',
-          pickupTime: '6:50 AM',
-          dropoffTime: '2:35 PM',
-        },
-        {
-          name: 'Airport Road',
-          pickupTime: '7:05 AM',
-          dropoffTime: '2:20 PM',
-        },
-        {
-          name: 'Basi School',
-          pickupTime: '7:30 AM',
-          dropoffTime: '2:00 PM',
-        },
-      ],
-    },
-    {
-      id: 6,
-      routeNumber: 'R106',
-      routeName: 'University Street Route',
-      serviceArea: 'North Amman',
-      startingPoint: 'Jubaiha',
-      destination: 'Basi School',
-      pickupTime: '6:50 AM',
-      dropoffTime: '2:40 PM',
-      assignedBus: null,
-      assignedDriver: null,
-      capacity: 30,
-      enrolledStudents: 30,
-      isActive: true,
-      stops: [
-        {
-          name: 'Jubaiha',
-          pickupTime: '6:50 AM',
-          dropoffTime: '2:40 PM',
-        },
-        {
-          name: 'Jordan University Gate',
-          pickupTime: '7:00 AM',
-          dropoffTime: '2:30 PM',
-        },
-        {
-          name: 'University Street',
-          pickupTime: '7:12 AM',
-          dropoffTime: '2:18 PM',
-        },
-        {
-          name: 'Basi School',
-          pickupTime: '7:30 AM',
-          dropoffTime: '2:00 PM',
-        },
-      ],
-    },
-  ]);
+  protected readonly routes = signal<readonly SchoolRoute[]>([]);
 
-  protected readonly serviceAreas = computed(() => [
-    ...new Set(this.routes().map((route) => route.serviceArea)),
-  ].sort());
+  public ngOnInit(): void {
+    this.loadRoutes();
+  }
+
+  protected loadRoutes(): void {
+    this.isLoading.set(true);
+    this.errorMessage.set('');
+
+    this.routeService
+      .getRoutes()
+      .pipe(
+        catchError(() => {
+          this.errorMessage.set('Unable to load routes at the moment. Please try again.');
+          return of<RouteItem[] | null>(null);
+        })
+      )
+      .subscribe((items) => {
+        if (items !== null) {
+          const mapped = items
+            .map((item) => this.mapRoute(item))
+            .filter((route) => this.isVisibleToParent(route));
+          this.routes.set(mapped);
+        } else {
+          this.routes.set([]);
+        }
+        this.isLoading.set(false);
+      });
+  }
+
+  protected readonly serviceAreas = computed(() =>
+    [...new Set(this.routes().map((route) => route.serviceArea).filter((area) => Boolean(area) && area !== '—'))].sort()
+  );
 
   protected readonly filteredRoutes = computed(() => {
     const search = this.searchTerm().trim().toLowerCase();
@@ -413,8 +236,10 @@ export class Routes {
 
     return this.routes().filter((route) => {
       const matchesSearch =
+        !search ||
         route.routeName.toLowerCase().includes(search) ||
-        route.routeNumber.toLowerCase().includes(search);
+        route.routeNumber.toLowerCase().includes(search) ||
+        route.serviceArea.toLowerCase().includes(search);
 
       const matchesArea =
         area === 'All' || route.serviceArea === area;
@@ -447,9 +272,197 @@ export class Routes {
   }
 
   protected toggleDetails(routeId: number): void {
+    const opening = this.selectedRouteId() !== routeId;
     this.selectedRouteId.update((currentId) =>
       currentId === routeId ? null : routeId
     );
+
+    if (opening) {
+      this.loadingDetailsId.set(routeId);
+      forkJoin({
+        details: this.routeService.getRouteDetails(routeId).pipe(catchError(() => of(null))),
+        stops: this.routeService.getStopsByRoute(routeId).pipe(catchError(() => of(null))),
+      }).subscribe(({ details, stops }) => {
+        this.routes.update((list) =>
+          list.map((route) =>
+            route.id === routeId ? this.mergeRouteDetails(route, details, stops) : route
+          )
+        );
+        this.loadingDetailsId.set(null);
+      });
+    }
+  }
+
+  private isVisibleToParent(route: SchoolRoute): boolean {
+    if (!route.isActive) return false;
+    const num = route.routeNumber.toUpperCase();
+    const name = route.routeName.toUpperCase();
+    return !num.startsWith('TEST') && !name.startsWith('TEST');
+  }
+
+  private mergeRouteDetails(
+    existing: SchoolRoute,
+    details: RouteItem | null,
+    stopsResponse: readonly ServiceRouteStop[] | null
+  ): SchoolRoute {
+    const mappedDetails = details ? this.mapRoute(details) : existing;
+    const rawStops =
+      stopsResponse && stopsResponse.length > 0
+        ? stopsResponse
+        : details?.stops && details.stops.length > 0
+          ? details.stops
+          : null;
+
+    const mappedStops = rawStops
+      ? [...rawStops]
+          .sort((a, b) => (a.stopOrder ?? 0) - (b.stopOrder ?? 0))
+          .map((s) => this.mapStop(s))
+      : existing.stops;
+
+    const times = this.resolveTimes(mappedStops, mappedDetails.pickupTime, mappedDetails.dropoffTime);
+
+    return {
+      ...existing,
+      ...mappedDetails,
+      stops: mappedStops,
+      pickupTime: times.pickupTime,
+      dropoffTime: times.dropoffTime,
+      assignedBus: mappedDetails.assignedBus ?? existing.assignedBus,
+      assignedDriver: mappedDetails.assignedDriver ?? existing.assignedDriver,
+    };
+  }
+
+  private mapRoute(raw: RouteItem): SchoolRoute {
+    const item = raw as unknown as Record<string, unknown>;
+    const id = Number(item['routeId'] ?? item['RouteId'] ?? item['id'] ?? item['Id'] ?? 0);
+    const routeNumber = this.pickStr(item, ['routeNumber', 'RouteNumber']) || (id ? `R${id}` : '—');
+    const routeName = this.pickStr(item, ['name', 'Name', 'routeName', 'RouteName']) || routeNumber;
+    const serviceArea = this.pickStr(item, ['serviceArea', 'ServiceArea']) || '—';
+    const startingPoint = this.pickStr(item, ['startPoint', 'StartPoint', 'startingPoint']) || '—';
+    const destination = this.pickStr(item, ['destination', 'Destination']) || '—';
+
+    let isActive = true;
+    if (typeof item['isActive'] === 'boolean') {
+      isActive = item['isActive'];
+    } else if (typeof item['status'] === 'string') {
+      isActive = (item['status'] as string).toLowerCase() === 'active';
+    } else if (item['isActive'] !== undefined) {
+      isActive = Boolean(item['isActive']);
+    }
+
+    const capacity = Number(item['capacity'] ?? item['Capacity'] ?? 0) || 0;
+    const enrolledStudents =
+      Number(
+        item['enrolledStudents'] ??
+          item['EnrolledStudents'] ??
+          item['studentCount'] ??
+          item['studentsCount'] ??
+          0
+      ) || 0;
+
+    const busObj = this.asRecord(item['bus'] ?? item['Bus']);
+    const assignedBusRaw =
+      this.pickStr(item, ['assignedBus', 'AssignedBus', 'busPlate', 'BusPlate', 'plateNumber', 'PlateNumber']) ||
+      (busObj ? this.pickStr(busObj, ['plateNumber', 'PlateNumber', 'busPlate']) : '');
+    const assignedBus = assignedBusRaw && assignedBusRaw !== '—' ? assignedBusRaw : null;
+
+    const driverObj = this.asRecord(item['driver'] ?? item['Driver']);
+    let assignedDriverRaw = this.pickStr(item, ['assignedDriver', 'AssignedDriver', 'driverName', 'DriverName']);
+    if (!assignedDriverRaw && typeof item['driver'] === 'string') {
+      assignedDriverRaw = (item['driver'] as string).trim();
+    }
+    if (!assignedDriverRaw && driverObj) {
+      assignedDriverRaw = this.pickStr(driverObj, ['fullName', 'FullName', 'name', 'Name']);
+    }
+    const assignedDriver = assignedDriverRaw && assignedDriverRaw !== '—' ? assignedDriverRaw : null;
+
+    const rawStops = Array.isArray(raw.stops)
+      ? [...raw.stops].sort((a, b) => (a.stopOrder ?? 0) - (b.stopOrder ?? 0))
+      : [];
+    const stops = rawStops.map((s) => this.mapStop(s));
+
+    const routePickup = this.pickStr(item, ['pickupTime', 'PickupTime', 'morningPickupTime']);
+    const routeDropoff = this.pickStr(item, ['dropoffTime', 'DropoffTime', 'afternoonDropoffTime']);
+    const { pickupTime, dropoffTime } = this.resolveTimes(stops, routePickup, routeDropoff);
+
+    return {
+      id,
+      routeNumber,
+      routeName,
+      serviceArea,
+      startingPoint,
+      destination,
+      pickupTime,
+      dropoffTime,
+      stops,
+      assignedBus,
+      assignedDriver,
+      capacity,
+      enrolledStudents,
+      isActive,
+    };
+  }
+
+  private mapStop(stop: ServiceRouteStop): RouteStop {
+    const raw = stop as unknown as Record<string, unknown>;
+    const name = this.pickStr(raw, ['name', 'Name', 'stopName', 'StopName']) || '—';
+    const pickup = this.formatTime(this.pickStr(raw, ['pickupTime', 'PickupTime']));
+    const dropoff = this.formatTime(this.pickStr(raw, ['dropoffTime', 'DropoffTime']));
+    return {
+      name,
+      pickupTime: pickup,
+      dropoffTime: dropoff,
+    };
+  }
+
+  private resolveTimes(
+    stops: readonly RouteStop[],
+    explicitPickup?: string,
+    explicitDropoff?: string
+  ): { pickupTime: string; dropoffTime: string } {
+    const validPickups = stops.map((s) => s.pickupTime).filter((t) => Boolean(t) && t !== '—');
+    const validDropoffs = stops.map((s) => s.dropoffTime).filter((t) => Boolean(t) && t !== '—');
+
+    const pickupTime =
+      (explicitPickup && explicitPickup !== '—' ? this.formatTime(explicitPickup) : '') ||
+      (validPickups.length > 0 ? validPickups[0] : '—');
+    const dropoffTime =
+      (explicitDropoff && explicitDropoff !== '—' ? this.formatTime(explicitDropoff) : '') ||
+      (validDropoffs.length > 0 ? validDropoffs[0] : '—');
+
+    return { pickupTime, dropoffTime };
+  }
+
+  private formatTime(value: string): string {
+    const trimmed = value.trim();
+    if (!trimmed) return '—';
+
+    const match = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(trimmed);
+    if (!match) return trimmed;
+
+    const hour24 = Number(match[1]);
+    const minute = match[2];
+    if (Number.isNaN(hour24) || hour24 < 0 || hour24 > 23) return trimmed;
+
+    const suffix = hour24 >= 12 ? 'PM' : 'AM';
+    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    return `${hour12}:${minute} ${suffix}`;
+  }
+
+  private pickStr(obj: Record<string, unknown>, keys: readonly string[]): string {
+    for (const key of keys) {
+      const val = obj[key];
+      if (typeof val === 'string' && val.trim()) {
+        return val.trim();
+      }
+    }
+    return '';
+  }
+
+  private asRecord(val: unknown): Record<string, unknown> | null {
+    return val !== null && typeof val === 'object' && !Array.isArray(val)
+      ? (val as Record<string, unknown>)
+      : null;
   }
 
   protected toggleMenu(): void {

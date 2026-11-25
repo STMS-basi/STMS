@@ -36,7 +36,7 @@ describe('adminGuard', () => {
     expect(result).toBe(true);
   });
 
-  it('should redirect to login if user has Parent role instead of Admin', () => {
+  it('should redirect to access-denied if user has Parent role instead of Admin', () => {
     authService.setSession({
       token: 'mock_jwt_token',
       role: 'Parent',
@@ -46,7 +46,7 @@ describe('adminGuard', () => {
 
     const result = TestBed.runInInjectionContext(() => adminGuard({} as any, {} as any));
     expect(result instanceof UrlTree).toBe(true);
-    expect((result as UrlTree).toString()).toBe('/login');
+    expect((result as UrlTree).toString()).toBe('/access-denied');
   });
 
   it('should redirect to login if user is unauthenticated', () => {

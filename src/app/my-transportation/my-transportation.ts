@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { Header } from '../header/header';
 import { AuthService } from '../services/auth.service';
 import { PreferencesService } from '../services/preferences.service';
+import { RouteService } from '../services/route.service';
 import {
   SubscriptionItem,
   SubscriptionService
@@ -37,8 +38,10 @@ export class MyTransportation implements OnInit {
 
   private readonly authService = inject(AuthService);
   private readonly subscriptionService = inject(SubscriptionService);
+  private readonly routeService = inject(RouteService);
 
   public ngOnInit(): void {
+    this.routeService.fetchRoutes().subscribe();
     this.subscriptionService.fetchSubscriptions().subscribe();
   }
 
@@ -51,15 +54,13 @@ export class MyTransportation implements OnInit {
 
   public readonly subscriptions = computed(() => {
     const email = this.authService.userEmail()?.toLowerCase();
-    const list = this.subscriptionService.subscriptions();
-
-    if (!email) {
-      return list;
+    if (!this.authService.isAuthenticated() || !email) {
+      return [];
     }
 
-    return list.filter(
-      (sub) => !sub.parentEmail || sub.parentEmail.toLowerCase() === email
-    );
+    return this.subscriptionService
+      .subscriptions()
+      .filter((sub) => sub.parentEmail?.toLowerCase() === email);
   });
 
   public readonly selectedSubscription = computed(() => {
@@ -221,8 +222,10 @@ export class MyTransportation implements OnInit {
   }
 
   public formatRoute(sub: SubscriptionItem): string {
-    const num = (sub.routeNumber || '').trim();
-    let name = (sub.routeName || '').trim();
+    const matched = sub.routeId > 0 ? this.routeService.findLiveRouteById(sub.routeId) : undefined;
+    const rawNum = (sub.routeNumber || matched?.routeNumber || '').trim();
+    const num = rawNum === '-' || rawNum === '—' ? '' : rawNum;
+    let name = (sub.routeName || matched?.name || '').trim();
     // Clean any leading dash/hyphen or bullet
     name = name.replace(/^[-–—•]\s*/, '');
 

@@ -111,11 +111,30 @@
         </div>
 
         <!-- Route Cards -->
-        @if (filteredRoutes().length > 0) {
+        @if (isLoading()) {
+
+          <div class="empty-state">
+            <h3>{{ translate('Loading routes...') }}</h3>
+          </div>
+
+        } @else if (errorMessage() && routes().length === 0) {
+
+          <div class="empty-state">
+            <h3>{{ translate(errorMessage()) }}</h3>
+            <button
+              type="button"
+              class="btn btn-primary"
+              (click)="loadRoutes()"
+            >
+              {{ translate('Retry') }}
+            </button>
+          </div>
+
+        } @else if (filteredRoutes().length > 0) {
 
           <div class="routes-grid">
 
-            @for (route of filteredRoutes(); track route.id) {
+            @for (route of filteredRoutes(); track route.id || $index) {
 
               <div class="card route-card">
 
@@ -222,13 +241,19 @@
 
                   <h4>{{ translate('Stops') }}</h4>
 
-                  <ol class="stops-list">
+                  @if (route.stops.length > 0) {
+                    <ol class="stops-list">
 
-                    @for (stop of route.stops; track stop.name) {
-                      <li>{{ translate(stop.name) }}</li>
-                    }
+                      @for (stop of route.stops; track $index) {
+                        <li>{{ translate(stop.name) }}</li>
+                      }
 
-                  </ol>
+                    </ol>
+                  } @else {
+                    <p class="route-area">
+                      {{ translate('Click View Route Details to load stop schedules.') }}
+                    </p>
+                  }
 
                 </div>
 
@@ -318,35 +343,45 @@
                       {{ translate('Stops and Pickup / Drop-off Schedules') }}
                     </h5>
 
-                    <div class="schedule-table-wrapper">
+                    @if (loadingDetailsId() === route.id) {
+                      <p class="route-area">
+                        {{ translate('Loading route details...') }}
+                      </p>
+                    } @else if (route.stops.length > 0) {
+                      <div class="schedule-table-wrapper">
 
-                      <table class="schedule-table">
+                        <table class="schedule-table">
 
-                        <thead>
-                          <tr>
-                            <th>{{ translate('Stop') }}</th>
-                            <th>{{ translate('Morning Pickup') }}</th>
-                            <th>{{ translate('Afternoon Drop-off') }}</th>
-                          </tr>
-                        </thead>
-
-                        <tbody>
-
-                          @for (stop of route.stops; track stop.name) {
-
+                          <thead>
                             <tr>
-                              <td>{{ translate(stop.name) }}</td>
-                              <td>{{ stop.pickupTime }}</td>
-                              <td>{{ stop.dropoffTime }}</td>
+                              <th>{{ translate('Stop') }}</th>
+                              <th>{{ translate('Morning Pickup') }}</th>
+                              <th>{{ translate('Afternoon Drop-off') }}</th>
                             </tr>
+                          </thead>
 
-                          }
+                          <tbody>
 
-                        </tbody>
+                            @for (stop of route.stops; track $index) {
 
-                      </table>
+                              <tr>
+                                <td>{{ translate(stop.name) }}</td>
+                                <td>{{ stop.pickupTime }}</td>
+                                <td>{{ stop.dropoffTime }}</td>
+                              </tr>
 
-                    </div>
+                            }
+
+                          </tbody>
+
+                        </table>
+
+                      </div>
+                    } @else {
+                      <p class="route-area">
+                        {{ translate('No stop schedules available for this route yet.') }}
+                      </p>
+                    }
 
                     <!-- Bus and Driver Information -->
                     <h5>
@@ -445,11 +480,6 @@
                       </div>
 
                     </div>
-
-                    <!-- Schedule Notice -->
-                    <p class="schedule-note">
-                      {{ translate('These are demonstration schedules and capacity figures. Actual information should be confirmed with the transportation office.') }}
-                    </p>
 
                     <!-- Transportation Request -->
                     <div class="details-subscribe">

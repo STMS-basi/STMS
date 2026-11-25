@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, effect, inject, signal, untracked } from '@angular/core';
 import { Observable, catchError, map, of, tap } from 'rxjs';
 import { AuthService } from './auth.service';
+import { RouteService } from './route.service';
 
 export type TransportType = 'OneWay' | 'RoundTrip';
 export type SubscriptionStatus = 'Pending' | 'AwaitingPayment' | 'Approved' | 'Rejected';
@@ -83,17 +84,36 @@ const STORAGE_SUBSCRIPTIONS_KEY = 'stms_subscriptions';
 export class SubscriptionService {
   private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
+  private readonly routeService = inject(RouteService);
 
   private readonly subscriptionsSignal = signal<SubscriptionItem[]>(
     this.loadStoredSubscriptions()
   );
 
   public readonly subscriptions = this.subscriptionsSignal.asReadonly();
+  private activeStorageKey = this.getStorageKey();
+
+  constructor() {
+    effect(() => {
+      const nextKey = this.getStorageKey();
+      if (nextKey !== this.activeStorageKey) {
+        this.activeStorageKey = nextKey;
+        untracked(() => {
+          this.subscriptionsSignal.set(this.loadStoredSubscriptions());
+        });
+      }
+    });
+  }
+
+  private getStorageKey(): string {
+    const email = this.authService.userEmail()?.trim().toLowerCase();
+    return email ? `${STORAGE_SUBSCRIPTIONS_KEY}_${email}` : `${STORAGE_SUBSCRIPTIONS_KEY}_guest`;
+  }
 
   private loadStoredSubscriptions(): SubscriptionItem[] {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
-        const stored = localStorage.getItem(STORAGE_SUBSCRIPTIONS_KEY);
+        const stored = localStorage.getItem(this.getStorageKey());
 
         if (stored) {
           return JSON.parse(stored) as SubscriptionItem[];
@@ -110,7 +130,7 @@ export class SubscriptionService {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.setItem(
-          STORAGE_SUBSCRIPTIONS_KEY,
+          this.getStorageKey(),
           JSON.stringify(items)
         );
       }
@@ -125,39 +145,52 @@ export class SubscriptionService {
   }
 
   public fetchSubscriptions(): Observable<SubscriptionItem[]> {
+    const currentLocal = this.loadStoredSubscriptions();
+    this.subscriptionsSignal.set(currentLocal);
+
     return this.http.get<unknown[]>('/api/subscriptions').pipe(
       map((items) => {
         if (!Array.isArray(items)) return [];
-        const email = this.authService.userEmail()?.toLowerCase() ?? '';
-        return items.map((raw: any): SubscriptionItem => ({
-          subscriptionId: Number(raw.subscriptionId ?? raw.id ?? 0),
-          referenceNumber: String(raw.referenceNumber ?? ''),
-          studentId: Number(raw.studentId ?? 0),
-          studentName: String(raw.studentName ?? raw.student ?? ''),
-          studentGrade: String(raw.studentGrade ?? raw.grade ?? ''),
-          routeId: Number(raw.routeId ?? 0),
-          routeNumber: String(raw.routeNumber ?? raw.route?.routeNumber ?? ''),
-          routeName: String(raw.routeName ?? raw.route?.name ?? raw.route?.routeName ?? ''),
-          stopId: Number(raw.stopId ?? 0),
-          stopName: String(raw.stopName ?? raw.stop?.name ?? ''),
-          pickupTime: String(raw.pickupTime ?? raw.pickUpTime ?? raw.stop?.pickupTime ?? ''),
-          dropoffTime: String(raw.dropoffTime ?? raw.dropOffTime ?? raw.stop?.dropoffTime ?? ''),
-          transportType: (raw.transportType === 'OneWay' ? 'OneWay' : 'RoundTrip') as TransportType,
-          fee: Number(raw.fee ?? (raw.transportType === 'OneWay' ? 150 : 300)),
-          status: (raw.status ?? 'Pending') as SubscriptionStatus,
-          startDate: String(raw.startDate ?? '2026-09-01'),
-          endDate: String(raw.endDate ?? '2026-12-31'),
-          requestedAt: String(raw.requestedAt ?? raw.createdAt ?? new Date().toISOString()),
-          parentEmail: String(raw.parentEmail || email),
-        }));
+        const email = this.authService.userEmail()?.trim().toLowerCase() ?? '';
+        return items.map((raw: any): SubscriptionItem => {
+          const routeId = Number(raw.routeId ?? raw.route?.routeId ?? 0);
+          const matchedRoute = routeId > 0 ? this.routeService.findLiveRouteById(routeId) : undefined;
+          const rawNum = String(raw.routeNumber ?? raw.route?.routeNumber ?? '').trim();
+          const cleanNum = rawNum && rawNum !== '-' && rawNum !== '—' ? rawNum : matchedRoute?.routeNumber ?? '';
+          const rawName = String(
+            raw.routeName ?? raw.route?.name ?? raw.route?.routeName ?? matchedRoute?.name ?? ''
+          )
+            .trim()
+            .replace(/^[-–—•]\s*/, '');
+
+          return {
+            subscriptionId: Number(raw.subscriptionId ?? raw.id ?? 0),
+            referenceNumber: String(raw.referenceNumber ?? ''),
+            studentId: Number(raw.studentId ?? 0),
+            studentName: String(raw.studentName ?? raw.student ?? ''),
+            studentGrade: String(raw.studentGrade ?? raw.grade ?? ''),
+            routeId,
+            routeNumber: cleanNum,
+            routeName: rawName,
+            stopId: Number(raw.stopId ?? 0),
+            stopName: String(raw.stopName ?? raw.stop?.name ?? ''),
+            pickupTime: String(raw.pickupTime ?? raw.pickUpTime ?? raw.stop?.pickupTime ?? ''),
+            dropoffTime: String(raw.dropoffTime ?? raw.dropOffTime ?? raw.stop?.dropoffTime ?? ''),
+            transportType: (raw.transportType === 'OneWay' ? 'OneWay' : 'RoundTrip') as TransportType,
+            fee: Number(raw.fee ?? (raw.transportType === 'OneWay' ? 150 : 300)),
+            status: (raw.status ?? 'Pending') as SubscriptionStatus,
+            startDate: String(raw.startDate ?? '2026-09-01'),
+            endDate: String(raw.endDate ?? '2026-12-31'),
+            requestedAt: String(raw.requestedAt ?? raw.createdAt ?? new Date().toISOString()),
+            parentEmail: String(raw.parentEmail || email).toLowerCase(),
+          };
+        });
       }),
       tap((mapped) => {
-        if (mapped.length > 0) {
-          this.subscriptionsSignal.set(mapped);
-          this.persist(mapped);
-        }
+        this.subscriptionsSignal.set(mapped);
+        this.persist(mapped);
       }),
-      catchError(() => of(this.subscriptionsSignal()))
+      catchError(() => of(currentLocal))
     );
   }
 
