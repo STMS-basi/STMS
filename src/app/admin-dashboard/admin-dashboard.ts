@@ -1,15 +1,14 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Observable } from 'rxjs';
 import { Header } from '../header/header';
 import { PreferencesService } from '../services/preferences.service';
 import {
-  AdminBusItem,
-  AdminDriverItem,
   AdminPaymentItem,
-  AdminRouteItem,
+  AdminResource,
   AdminService,
-  AdminStopItem,
   AdminSubscriptionItem,
 } from '../services/admin.service';
 
@@ -35,22 +34,9 @@ export class AdminDashboard implements OnInit {
   protected readonly adminService = inject(AdminService);
   private readonly fb = inject(NonNullableFormBuilder);
 
-  public ngOnInit(): void {
-    this.refreshAll();
-  }
-
-  public refreshAll(): void {
-    this.adminService.fetchStudents().subscribe();
-    this.adminService.fetchParents().subscribe();
-    this.adminService.fetchRoutes().subscribe();
-    this.adminService.fetchStops().subscribe();
-    this.adminService.fetchBuses().subscribe();
-    this.adminService.fetchDrivers().subscribe();
-    this.adminService.fetchSubscriptions().subscribe();
-    this.adminService.fetchPayments().subscribe();
-  }
-
   public readonly activeTab = signal<AdminTab>('overview');
+  public readonly actionError = signal<string | null>(null);
+  public readonly busyAction = signal<string | null>(null);
 
   public readonly studentSearch = signal('');
   public readonly parentSearch = signal('');
@@ -94,6 +80,16 @@ export class AdminDashboard implements OnInit {
     assignedBus: ['', [Validators.required]],
   });
 
+  public readonly currentTabErrors = computed<string[]>(() => {
+    const errors = this.adminService.errors();
+    const tab = this.activeTab();
+    if (tab === 'overview') {
+      return Object.values(errors).filter((msg): msg is string => Boolean(msg));
+    }
+    const msg = errors[tab as AdminResource];
+    return msg ? [msg] : [];
+  });
+
   public readonly filteredStudents = computed(() => {
     const q = this.studentSearch().trim().toLowerCase();
     const list = this.adminService.students();
@@ -101,7 +97,7 @@ export class AdminDashboard implements OnInit {
       return list;
     }
     return list.filter(
-      s =>
+      (s) =>
         s.fullName.toLowerCase().includes(q) ||
         s.parentName.toLowerCase().includes(q) ||
         s.grade.toLowerCase().includes(q) ||
@@ -116,7 +112,7 @@ export class AdminDashboard implements OnInit {
       return list;
     }
     return list.filter(
-      p =>
+      (p) =>
         p.fullName.toLowerCase().includes(q) ||
         p.email.toLowerCase().includes(q) ||
         p.phone.includes(q) ||
@@ -130,7 +126,7 @@ export class AdminDashboard implements OnInit {
     if (filter === 'All') {
       return list;
     }
-    return list.filter(s => s.status === filter);
+    return list.filter((s) => s.status === filter);
   });
 
   public readonly filteredPayments = computed(() => {
@@ -139,7 +135,7 @@ export class AdminDashboard implements OnInit {
     if (filter === 'All') {
       return list;
     }
-    return list.filter(p => p.status === filter);
+    return list.filter((p) => p.status === filter);
   });
 
   public readonly capacityPercentage = computed(() => {
@@ -261,6 +257,7 @@ export class AdminDashboard implements OnInit {
     'Total Capacity': 'السعة الإجمالية',
     'Subscription Status': 'حالة الاشتراكات',
     'Active': 'نشط',
+    'Inactive': 'غير نشط',
     'Pending': 'قيد الانتظار',
     'AwaitingPayment': 'بانتظار سداد الرسوم',
     'Approved': 'تمت الموافقة',
@@ -311,6 +308,8 @@ export class AdminDashboard implements OnInit {
     'Recorded By': 'سجل بواسطة',
     'Cancel': 'إلغاء',
     'Save': 'حفظ',
+    'Retry': 'إعادة المحاولة',
+    'Dismiss': 'إغلاق',
     'Start Point': 'نقطة الانطلاق',
     'Destination': 'الوجهة',
     'RoundTrip': 'ذهاب وإياب',
@@ -323,6 +322,26 @@ export class AdminDashboard implements OnInit {
       '© 2026 مكتب الباصي للنقل المدرسي. جميع الحقوق محفوظة.',
   };
 
+  public ngOnInit(): void {
+    this.refreshAll();
+  }
+
+  public refreshAll(): void {
+    this.actionError.set(null);
+    this.adminService.fetchStudents().subscribe();
+    this.adminService.fetchParents().subscribe();
+    this.adminService.fetchRoutes().subscribe();
+    this.adminService.fetchStops().subscribe();
+    this.adminService.fetchBuses().subscribe();
+    this.adminService.fetchDrivers().subscribe();
+    this.adminService.fetchSubscriptions().subscribe();
+    this.adminService.fetchPayments().subscribe();
+  }
+
+  public retryCurrentTab(): void {
+    this.setTab(this.activeTab());
+  }
+
   public translate(value: string): string {
     if (this.prefs.lang() === 'ar') {
       return this.translations[value] || value;
@@ -330,8 +349,16 @@ export class AdminDashboard implements OnInit {
     return value;
   }
 
+  public formatRouteDisplay(routeNumber: string, routeName: string): string {
+    const num = routeNumber && routeNumber !== '—' ? routeNumber.trim() : '';
+    const name = routeName && routeName !== '—' ? routeName.trim() : '';
+    if (num && name) return `${num} ${name}`;
+    return num || name || '—';
+  }
+
   public setTab(tab: AdminTab): void {
     this.activeTab.set(tab);
+    this.actionError.set(null);
     if (tab === 'overview') {
       this.refreshAll();
     } else if (tab === 'students') {
@@ -355,28 +382,33 @@ export class AdminDashboard implements OnInit {
   }
 
   public approveSubscription(id: number): void {
-    this.adminService.approveSubscription(id).subscribe();
+    this.runMutation(`approve-${id}`, this.adminService.approveSubscription(id), () => {
+      this.adminService.fetchSubscriptions().subscribe();
+      this.adminService.fetchPayments().subscribe();
+    }, 'Failed to approve subscription.');
   }
 
   public rejectSubscription(id: number): void {
-    this.adminService.rejectSubscription(id).subscribe();
+    this.runMutation(`reject-${id}`, this.adminService.rejectSubscription(id), () => {
+      this.adminService.fetchSubscriptions().subscribe();
+    }, 'Failed to reject subscription.');
   }
 
   public toggleRoute(id: number): void {
-    this.adminService.toggleRouteActive(id).subscribe();
+    this.runMutation(`route-${id}`, this.adminService.toggleRouteActive(id), undefined, 'Failed to update route status.');
   }
 
   public toggleBus(id: number): void {
-    this.adminService.toggleBusActive(id).subscribe();
+    this.runMutation(`bus-${id}`, this.adminService.toggleBusActive(id), undefined, 'Failed to update bus status.');
   }
 
   public toggleDriver(id: number): void {
-    this.adminService.toggleDriverActive(id).subscribe();
+    this.runMutation(`driver-${id}`, this.adminService.toggleDriverActive(id), undefined, 'Failed to update driver status.');
   }
 
   public isSubscriptionPending(pm: AdminPaymentItem): boolean {
     const sub = this.resolveSubscription(pm);
-    return sub?.status === 'Pending';
+    return (sub?.status ?? pm.subscriptionStatus) === 'Pending';
   }
 
   public isPaymentEligible(pm: AdminPaymentItem): boolean {
@@ -384,10 +416,8 @@ export class AdminDashboard implements OnInit {
       return false;
     }
     const sub = this.resolveSubscription(pm);
-    if (!sub) {
-      return true;
-    }
-    return sub.status === 'AwaitingPayment';
+    const effectiveStatus = sub?.status ?? pm.subscriptionStatus;
+    return effectiveStatus === 'AwaitingPayment';
   }
 
   private resolveSubscription(pm: AdminPaymentItem): AdminSubscriptionItem | undefined {
@@ -400,44 +430,69 @@ export class AdminDashboard implements OnInit {
 
   public markPaymentPaid(id: number): void {
     const payment = this.adminService.payments().find((p) => p.paymentId === id);
-    if (!payment) return;
+    if (!payment || !this.isPaymentEligible(payment)) {
+      this.actionError.set(
+        this.prefs.lang() === 'ar'
+          ? 'لا يمكن تسجيل الدفع قبل الموافقة المبدئية على الاشتراك.'
+          : 'Only subscriptions awaiting payment can be marked as paid.'
+      );
+      return;
+    }
 
-    let subId = payment.subscriptionId;
+    const matchedSub = this.resolveSubscription(payment);
+    const subId = payment.subscriptionId ?? matchedSub?.subscriptionId;
     if (!subId) {
-      const matched = this.adminService.subscriptions().find((s) => s.referenceNumber === payment.referenceNumber);
-      if (matched) subId = matched.subscriptionId;
+      this.actionError.set(
+        this.prefs.lang() === 'ar'
+          ? 'تعذر ربط الدفعة بالاشتراك المطلوب.'
+          : 'Unable to match payment to a subscription.'
+      );
+      return;
     }
 
-    const fullAmount = payment.amountDue || 300;
-    this.adminService.updatePaymentStatus(id, 'Paid', fullAmount);
-
-    if (subId) {
-      this.adminService
-        .recordPayment({
-          subscriptionId: subId,
-          amount: fullAmount,
-          notes: 'Full payment confirmed by admin',
-        })
-        .subscribe(() => {
-          this.adminService.fetchPayments().subscribe();
-          this.adminService.fetchSubscriptions().subscribe();
-        });
-    }
+    const fullAmount = payment.amountDue || matchedSub?.fee || 300;
+    this.runMutation(
+      `pay-${id}`,
+      this.adminService.recordPayment({
+        subscriptionId: subId,
+        amount: fullAmount,
+        notes: 'Full payment confirmed by admin',
+      }),
+      () => {
+        this.adminService.fetchPayments().subscribe();
+        this.adminService.fetchSubscriptions().subscribe();
+      },
+      'Failed to record payment.'
+    );
   }
 
   public confirmSubscriptionPayment(sub: AdminSubscriptionItem): void {
-    this.adminService.recordPayment({
-      subscriptionId: sub.subscriptionId,
-      amount: sub.fee,
-      notes: 'Full payment confirmed by admin',
-    }).subscribe(() => {
-      this.adminService.fetchPayments().subscribe();
-      this.adminService.fetchSubscriptions().subscribe();
-    });
+    if (sub.status !== 'AwaitingPayment') {
+      this.actionError.set(
+        this.prefs.lang() === 'ar'
+          ? 'لا يمكن تسجيل الدفع قبل الموافقة المبدئية على الاشتراك.'
+          : 'Only subscriptions awaiting payment can be marked as paid.'
+      );
+      return;
+    }
+
+    this.runMutation(
+      `sub-pay-${sub.subscriptionId}`,
+      this.adminService.recordPayment({
+        subscriptionId: sub.subscriptionId,
+        amount: sub.fee,
+        notes: 'Full payment confirmed by admin',
+      }),
+      () => {
+        this.adminService.fetchPayments().subscribe();
+        this.adminService.fetchSubscriptions().subscribe();
+      },
+      'Failed to record payment.'
+    );
   }
 
   public deleteStop(id: number): void {
-    this.adminService.deleteStop(id).subscribe();
+    this.runMutation(`del-stop-${id}`, this.adminService.deleteStop(id), undefined, 'Failed to delete stop.');
   }
 
   public submitNewRoute(): void {
@@ -446,29 +501,35 @@ export class AdminDashboard implements OnInit {
       return;
     }
     const val = this.routeForm.getRawValue();
-    this.adminService.addRoute({
-      routeNumber: val.routeNumber.trim(),
-      name: val.name.trim(),
-      serviceArea: val.serviceArea.trim(),
-      capacity: Number(val.capacity),
-      startPoint: val.startPoint.trim(),
-      destination: val.destination.trim(),
-      busPlate: val.busPlate.trim(),
-      driverName: val.driverName.trim(),
-      enrolledStudents: 0,
-      isActive: true,
-    }).subscribe();
-    this.routeForm.reset({
-      routeNumber: '',
-      name: '',
-      serviceArea: '',
-      capacity: 30,
-      startPoint: '',
-      destination: 'Basi School',
-      busPlate: '',
-      driverName: '',
-    });
-    this.showAddRoute.set(false);
+    this.runMutation(
+      'add-route',
+      this.adminService.addRoute({
+        routeNumber: val.routeNumber.trim(),
+        name: val.name.trim(),
+        serviceArea: val.serviceArea.trim(),
+        capacity: Number(val.capacity),
+        startPoint: val.startPoint.trim(),
+        destination: val.destination.trim(),
+        busPlate: val.busPlate.trim(),
+        driverName: val.driverName.trim(),
+        enrolledStudents: 0,
+        isActive: true,
+      }),
+      () => {
+        this.routeForm.reset({
+          routeNumber: '',
+          name: '',
+          serviceArea: '',
+          capacity: 30,
+          startPoint: '',
+          destination: 'Basi School',
+          busPlate: '',
+          driverName: '',
+        });
+        this.showAddRoute.set(false);
+      },
+      'Failed to add route.'
+    );
   }
 
   public submitNewStop(): void {
@@ -477,23 +538,29 @@ export class AdminDashboard implements OnInit {
       return;
     }
     const val = this.stopForm.getRawValue();
-    const route = this.adminService.routes().find(r => r.routeId === Number(val.routeId));
-    this.adminService.addStop({
-      routeId: Number(val.routeId),
-      routeNumber: route?.routeNumber || 'R1',
-      name: val.name.trim(),
-      stopOrder: Number(val.stopOrder),
-      pickupTime: val.pickupTime.trim(),
-      dropoffTime: val.dropoffTime.trim(),
-    }).subscribe();
-    this.stopForm.reset({
-      routeId: 1,
-      name: '',
-      stopOrder: 1,
-      pickupTime: '7:00 AM',
-      dropoffTime: '2:30 PM',
-    });
-    this.showAddStop.set(false);
+    const route = this.adminService.routes().find((r) => r.routeId === Number(val.routeId));
+    this.runMutation(
+      'add-stop',
+      this.adminService.addStop({
+        routeId: Number(val.routeId),
+        routeNumber: route?.routeNumber || '—',
+        name: val.name.trim(),
+        stopOrder: Number(val.stopOrder),
+        pickupTime: val.pickupTime.trim(),
+        dropoffTime: val.dropoffTime.trim(),
+      }),
+      () => {
+        this.stopForm.reset({
+          routeId: 1,
+          name: '',
+          stopOrder: 1,
+          pickupTime: '7:00 AM',
+          dropoffTime: '2:30 PM',
+        });
+        this.showAddStop.set(false);
+      },
+      'Failed to add stop.'
+    );
   }
 
   public submitNewBus(): void {
@@ -502,18 +569,24 @@ export class AdminDashboard implements OnInit {
       return;
     }
     const val = this.busForm.getRawValue();
-    this.adminService.addBus({
-      plateNumber: val.plateNumber.trim(),
-      capacity: Number(val.capacity),
-      assignedRoute: val.assignedRoute.trim(),
-      isActive: true,
-    }).subscribe();
-    this.busForm.reset({
-      plateNumber: '',
-      capacity: 30,
-      assignedRoute: '',
-    });
-    this.showAddBus.set(false);
+    this.runMutation(
+      'add-bus',
+      this.adminService.addBus({
+        plateNumber: val.plateNumber.trim(),
+        capacity: Number(val.capacity),
+        assignedRoute: val.assignedRoute.trim(),
+        isActive: true,
+      }),
+      () => {
+        this.busForm.reset({
+          plateNumber: '',
+          capacity: 30,
+          assignedRoute: '',
+        });
+        this.showAddBus.set(false);
+      },
+      'Failed to add bus.'
+    );
   }
 
   public submitNewDriver(): void {
@@ -522,20 +595,26 @@ export class AdminDashboard implements OnInit {
       return;
     }
     const val = this.driverForm.getRawValue();
-    this.adminService.addDriver({
-      fullName: val.fullName.trim(),
-      phone: val.phone.trim(),
-      licenseNumber: val.licenseNumber.trim(),
-      assignedBus: val.assignedBus.trim(),
-      isActive: true,
-    }).subscribe();
-    this.driverForm.reset({
-      fullName: '',
-      phone: '',
-      licenseNumber: '',
-      assignedBus: '',
-    });
-    this.showAddDriver.set(false);
+    this.runMutation(
+      'add-driver',
+      this.adminService.addDriver({
+        fullName: val.fullName.trim(),
+        phone: val.phone.trim(),
+        licenseNumber: val.licenseNumber.trim(),
+        assignedBus: val.assignedBus.trim(),
+        isActive: true,
+      }),
+      () => {
+        this.driverForm.reset({
+          fullName: '',
+          phone: '',
+          licenseNumber: '',
+          assignedBus: '',
+        });
+        this.showAddDriver.set(false);
+      },
+      'Failed to add driver.'
+    );
   }
 
   public getStatusClass(status: string): string {
@@ -556,5 +635,42 @@ export class AdminDashboard implements OnInit {
       default:
         return '';
     }
+  }
+
+  private runMutation(
+    actionKey: string,
+    request$: Observable<unknown>,
+    onSuccess?: () => void,
+    fallbackMsg = 'Operation failed. Please try again.'
+  ): void {
+    if (this.busyAction()) return;
+    this.actionError.set(null);
+    this.busyAction.set(actionKey);
+
+    request$.subscribe({
+      next: () => {
+        this.busyAction.set(null);
+        onSuccess?.();
+      },
+      error: (err) => {
+        this.busyAction.set(null);
+        this.actionError.set(this.extractErrorMessage(err, fallbackMsg));
+      },
+    });
+  }
+
+  private extractErrorMessage(err: unknown, fallback: string): string {
+    const httpErr = err as HttpErrorResponse | undefined;
+    if (httpErr?.error && typeof httpErr.error === 'object' && 'message' in httpErr.error) {
+      const msg = String((httpErr.error as Record<string, unknown>)['message']).trim();
+      if (msg) return msg;
+    }
+    if (typeof httpErr?.error === 'string' && httpErr.error.trim()) {
+      return httpErr.error.trim();
+    }
+    if (err instanceof Error && err.message) {
+      return err.message;
+    }
+    return fallback;
   }
 }
