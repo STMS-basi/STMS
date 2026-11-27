@@ -24,23 +24,33 @@ export interface RouteItem {
   readonly busPlate?: string | null;
   readonly assignedBus?: string | null;
   readonly plateNumber?: string | null;
+  readonly busIsActive?: boolean | null;
+  readonly busStatus?: string | null;
   readonly bus?: {
     readonly busId?: number;
     readonly plateNumber?: string;
     readonly busPlate?: string;
     readonly model?: string;
+    readonly isActive?: boolean;
+    readonly status?: string;
   } | null;
   readonly driverId?: number | null;
   readonly driverName?: string | null;
   readonly assignedDriver?: string | null;
+  readonly driverIsActive?: boolean | null;
+  readonly driverStatus?: string | null;
   readonly driver?:
     | string
     | {
         readonly driverId?: number;
         readonly fullName?: string;
         readonly name?: string;
+        readonly isActive?: boolean;
+        readonly status?: string;
       }
     | null;
+  readonly isEligible?: boolean | null;
+  readonly eligibleForSubscription?: boolean | null;
   readonly stops: readonly RouteStop[];
 }
 

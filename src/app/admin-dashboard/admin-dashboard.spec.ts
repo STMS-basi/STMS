@@ -180,6 +180,31 @@ describe('AdminDashboard', () => {
     expect(component.actionError()).toBeTruthy();
   });
 
+  it('should omit Partial from main payment filter pills while retaining legacy Partial records under All', () => {
+    component.setTab('payments');
+    httpTesting.expectOne('/api/payments/admin').flush([
+      { paymentId: 501, subscriptionId: 1001, referenceNumber: 'SUB-1001', studentName: 'Yousef', parentName: 'Ahmad', amountDue: 300, amountPaid: 300, paymentStatus: 'Paid' },
+      { paymentId: 601, subscriptionId: 9001, referenceNumber: 'SUB-9001', studentName: 'Ahmad Ali', parentName: 'Test Parent', amountDue: 300, amountPaid: 200, paymentStatus: 'Partial', paymentDate: '2026-11-12T22:34:52' },
+    ]);
+    httpTesting.expectOne('/api/subscriptions/admin').flush([
+      { subscriptionId: 1001, referenceNumber: 'SUB-1001', studentName: 'Yousef', parentName: 'Ahmad', status: 'Approved', fee: 300 },
+    ]);
+
+    fixture.detectChanges();
+
+    const filterTexts = Array.from(
+      fixture.nativeElement.querySelectorAll('.filter-pills .pill-btn') as NodeListOf<HTMLButtonElement>
+    ).map((btn) => btn.textContent?.trim());
+    expect(filterTexts).toEqual(['All', 'Paid', 'Unpaid']);
+
+    expect(component.paymentFilter()).toBe('All');
+    expect(component.legacyPartialCount()).toBe(1);
+    const tableText = fixture.nativeElement.querySelector('.requests-table')?.textContent as string;
+    expect(tableText).toContain('SUB-9001');
+    expect(tableText).toContain('Partial');
+    expect(tableText).toContain('200 JOD');
+  });
+
   it('should toggle driver and delete stop after backend response', () => {
     component.toggleDriver(1);
     httpTesting.expectOne('/api/drivers/admin/1/deactivate').flush({});
@@ -224,5 +249,212 @@ describe('AdminDashboard', () => {
     httpTesting.expectOne('/api/stops/admin').flush([{ stopId: 77, routeId: 1, name: 'Zahran Street', stopOrder: 5 }]);
     expect(adminService.stops().some((s) => s.name === 'Zahran Street')).toBe(true);
     expect(component.showAddStop()).toBe(false);
+  });
+
+  it('should translate all management section headings, subtitles, and Email column into Arabic', () => {
+    const prefs = TestBed.inject(PreferencesService);
+    prefs.setLanguage('ar');
+
+    component.setTab('payments');
+    httpTesting.expectOne('/api/payments/admin').flush([]);
+    httpTesting.expectOne('/api/subscriptions/admin').flush([]);
+    fixture.detectChanges();
+
+    const paymentsText = fixture.nativeElement.textContent;
+    expect(paymentsText).toContain('إدارة المدفوعات');
+    expect(paymentsText).toContain('تسجيل وتحديث حالات الدفع.');
+    expect(paymentsText).not.toContain('Payment Management');
+    expect(paymentsText).not.toContain('Record and update payment statuses.');
+
+    component.setTab('parents');
+    httpTesting.expectOne('/api/parents/admin').flush([]);
+    fixture.detectChanges();
+
+    const parentsText = fixture.nativeElement.textContent;
+    expect(parentsText).toContain('إدارة أولياء الأمور');
+    expect(parentsText).toContain('عرض سجلات أولياء الأمور والأوصياء المسجلين.');
+    expect(parentsText).toContain('البريد الإلكتروني');
+    expect(parentsText).not.toContain('Parent Management');
+    expect(parentsText).not.toContain('Email');
+
+    const otherSectionKeys = [
+      'Student Management',
+      'View and manage student transportation records.',
+      'Route Management',
+      'Add, edit, activate and deactivate routes.',
+      'Stop Management',
+      'Manage pickup and drop off stops.',
+      'Bus Management',
+      'Add and update buses and seating capacity.',
+      'Driver Management',
+      'Manage driver information and assignments.',
+      'Subscription Management',
+      'Review, approve, reject and update transportation subscriptions.',
+    ];
+    for (const key of otherSectionKeys) {
+      expect(component.translate(key)).not.toBe(key);
+    }
+
+    prefs.setLanguage('en');
+  });
+
+  it('should display empty search results message inside Parents and Students tables in English and Arabic', () => {
+    const prefs = TestBed.inject(PreferencesService);
+
+    component.setTab('parents');
+    httpTesting.expectOne('/api/parents/admin').flush([
+      { parentId: 1, fullName: 'Ahmad', email: 'ahmad@test.com', phone: '0791234567', studentCount: 1 },
+    ]);
+    component.parentSearch.set('ZZZ_NOT_FOUND_999');
+    fixture.detectChanges();
+
+    let emptyCell = fixture.nativeElement.querySelector('td.table-empty-cell') as HTMLTableCellElement | null;
+    expect(emptyCell?.getAttribute('colspan')).toBe('5');
+    expect(emptyCell?.textContent?.trim()).toBe('No matching search results.');
+
+    prefs.setLanguage('ar');
+    fixture.detectChanges();
+    emptyCell = fixture.nativeElement.querySelector('td.table-empty-cell') as HTMLTableCellElement | null;
+    expect(emptyCell?.textContent?.trim()).toBe('لا توجد نتائج مطابقة للبحث.');
+
+    component.setTab('students');
+    httpTesting.expectOne('/api/students/admin').flush([
+      { studentId: 101, fullName: 'Yousef', parentName: 'Ahmad', grade: 'Grade 5', className: '5A' },
+    ]);
+    component.studentSearch.set('NO_MATCH_NAME');
+    fixture.detectChanges();
+
+    emptyCell = fixture.nativeElement.querySelector('td.table-empty-cell') as HTMLTableCellElement | null;
+    expect(emptyCell?.getAttribute('colspan')).toBe('8');
+    expect(emptyCell?.textContent?.trim()).toBe('لا توجد نتائج مطابقة للبحث.');
+
+    prefs.setLanguage('en');
+    fixture.detectChanges();
+    emptyCell = fixture.nativeElement.querySelector('td.table-empty-cell') as HTMLTableCellElement | null;
+    expect(emptyCell?.textContent?.trim()).toBe('No matching search results.');
+
+    component.setTab('subscriptions');
+    httpTesting.expectOne('/api/subscriptions/admin').flush([]);
+    component.subscriptionFilter.set('Rejected');
+    fixture.detectChanges();
+    emptyCell = fixture.nativeElement.querySelector('td.table-empty-cell') as HTMLTableCellElement | null;
+    expect(emptyCell?.getAttribute('colspan')).toBe('9');
+    expect(emptyCell?.textContent?.trim()).toBe('No matching results.');
+
+    prefs.setLanguage('ar');
+    fixture.detectChanges();
+    emptyCell = fixture.nativeElement.querySelector('td.table-empty-cell') as HTMLTableCellElement | null;
+    expect(emptyCell?.textContent?.trim()).toBe('لا توجد نتائج مطابقة.');
+
+    prefs.setLanguage('en');
+  });
+
+  it('should display Approved subscription route in Student Management table when /api/students/admin omits route fields', () => {
+    component.setTab('students');
+    httpTesting.expectOne('/api/students/admin').flush([
+      { studentId: 71, fullName: 'Capacity Test Student Two', grade: '5', className: 'A', parentId: 21, parentName: 'Test Parent' },
+    ]);
+
+    component.setTab('routes');
+    httpTesting.expectOne('/api/routes/admin').flush([
+      { routeId: 45, routeNumber: 'TEST-ACTIVE-01', name: 'Active Driver and Bus Test', capacity: 25, enrolledStudents: 1, isActive: true },
+    ]);
+
+    component.setTab('subscriptions');
+    httpTesting.expectOne('/api/subscriptions/admin').flush([
+      { subscriptionId: 101, studentId: 71, routeId: 45, stopId: 62, stopName: 'R26 Test Stop', transportType: 'OneWay', status: 'Approved' },
+    ]);
+
+    component.setTab('students');
+    httpTesting.expectOne('/api/students/admin').flush([
+      { studentId: 71, fullName: 'Capacity Test Student Two', grade: '5', className: 'A', parentId: 21, parentName: 'Test Parent' },
+    ]);
+    fixture.detectChanges();
+
+    const rowsText = fixture.nativeElement.querySelector('.requests-table')?.textContent as string;
+    expect(rowsText).toContain('TEST-ACTIVE-01 Active Driver and Bus Test');
+    expect(rowsText).toContain('R26 Test Stop');
+
+    component.studentSearch.set('Active Driver');
+    fixture.detectChanges();
+    expect(component.filteredStudents().length).toBe(1);
+    expect(component.filteredStudents()[0].studentId).toBe(71);
+  });
+
+  it('should show Approved enrolledStudents over capacity in Route Management and show dash when enrollment data is unavailable', () => {
+    component.setTab('routes');
+    httpTesting.expectOne('/api/routes/admin').flush([
+      { routeId: 45, routeNumber: 'TEST-ACTIVE-01', name: 'Active Driver and Bus Test', capacity: 20, isActive: true },
+    ]);
+    component.setTab('subscriptions');
+    httpTesting.expectOne('/api/subscriptions/admin').flush([
+      { subscriptionId: 101, studentId: 71, studentName: 'Capacity Test Student Two', routeId: 45, status: 'Approved' },
+    ]);
+
+    component.setTab('routes');
+    httpTesting.expectOne('/api/routes/admin').flush([
+      { routeId: 45, routeNumber: 'TEST-ACTIVE-01', name: 'Active Driver and Bus Test', capacity: 20, isActive: true },
+    ]);
+    fixture.detectChanges();
+
+    const routesText = fixture.nativeElement.querySelector('.requests-table')?.textContent as string;
+    expect(routesText).toContain('1 / 20');
+
+    // Simulate subscriptions unavailable (backend omitted count + subscriptions API failed)
+    component.setTab('subscriptions');
+    httpTesting.expectOne('/api/subscriptions/admin').flush({ message: 'Forbidden' }, { status: 403, statusText: 'Forbidden' });
+    component.setTab('routes');
+    httpTesting.expectOne('/api/routes/admin').flush([
+      { routeId: 45, routeNumber: 'TEST-ACTIVE-01', name: 'Active Driver and Bus Test', capacity: 20, isActive: true },
+    ]);
+    fixture.detectChanges();
+
+    const unavailableText = fixture.nativeElement.querySelector('.requests-table')?.textContent as string;
+    expect(unavailableText).toContain('— / 20');
+    expect(unavailableText).not.toContain('0 / 20');
+  });
+
+  it('should filter students by route number, route name, combined route display, and stop name', () => {
+    component.setTab('routes');
+    httpTesting.expectOne('/api/routes/admin').flush([
+      { routeId: 1, routeNumber: 'R1', name: 'Abdoun Line', capacity: 30, isActive: true },
+      { routeId: 2, routeNumber: 'R2', name: 'Jubeiha Line', capacity: 30, isActive: true },
+    ]);
+
+    component.setTab('stops');
+    httpTesting.expectOne('/api/stops/admin').flush([
+      { stopId: 11, routeId: 1, name: 'Abdoun Circle', stopOrder: 1 },
+      { stopId: 22, routeId: 2, name: 'Jubeiha Main St', stopOrder: 1 },
+    ]);
+
+    component.setTab('subscriptions');
+    httpTesting.expectOne('/api/subscriptions/admin').flush([
+      { subscriptionId: 201, studentId: 1, routeId: 0, stopName: 'Abdoun Circle', transportType: 'RoundTrip', status: 'Approved' },
+      { subscriptionId: 202, studentId: 2, routeId: 2, stopId: 22, transportType: 'OneWay', status: 'Approved' },
+    ]);
+
+    component.setTab('students');
+    httpTesting.expectOne('/api/students/admin').flush([
+      { studentId: 1, fullName: 'Yazan Ahmad', grade: 'Grade 5', className: 'A', parentName: 'Ahmad' },
+      { studentId: 2, fullName: 'Layan Saleh', grade: 'Grade 6', className: 'A', parentName: 'Mona' },
+      { studentId: 3, fullName: 'Unsubscribed Student', grade: 'Grade 1', className: 'B', parentName: 'Ali' },
+    ]);
+    fixture.detectChanges();
+
+    // Search by routeNumber
+    component.studentSearch.set('R1');
+    expect(component.filteredStudents().map((s) => s.fullName)).toEqual(['Yazan Ahmad']);
+
+    // Search by routeName
+    component.studentSearch.set('Abdoun Line');
+    expect(component.filteredStudents().map((s) => s.fullName)).toEqual(['Yazan Ahmad']);
+
+    // Search by combined route display
+    component.studentSearch.set('R1 Abdoun Line');
+    expect(component.filteredStudents().map((s) => s.fullName)).toEqual(['Yazan Ahmad']);
+
+    // Search by stopName
+    component.studentSearch.set('Jubeiha Main St');
+    expect(component.filteredStudents().map((s) => s.fullName)).toEqual(['Layan Saleh']);
   });
 });

@@ -172,39 +172,6 @@
   background-color: var(--bg-alt);
 }
 
-/* Call To Action */
-.cta-section {
-  background-color: var(--cta-bg);
-  border-block: 1px solid var(--border-cta);
-  padding: 4rem 1.5rem;
-  text-align: center;
-}
-
-.cta-container {
-  max-width: 650px;
-  margin: 0 auto;
-}
-
-.cta-title {
-  font-size: 2rem;
-  font-weight: 800;
-  color: var(--text-main);
-  margin-bottom: 0.75rem;
-}
-
-.cta-description {
-  font-size: 1.05rem;
-  color: var(--text-muted);
-  margin-bottom: 1.75rem;
-}
-
-.cta-actions {
-  display: flex;
-  justify-content: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
 /* Footer */
 .footer {
   background-color: var(--dark);

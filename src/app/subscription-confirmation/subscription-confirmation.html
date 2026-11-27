@@ -53,14 +53,18 @@
                   <span class="detail-name">{{ t().selectedStopLabel }}</span>
                   <span class="detail-val">{{ sub.stopName }}</span>
                 </div>
-                <div class="detail-row">
-                  <span class="detail-name">{{ t().pickupTimeLabel }}</span>
-                  <span class="detail-val">{{ sub.pickupTime }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-name">{{ t().dropoffTimeLabel }}</span>
-                  <span class="detail-val">{{ sub.dropoffTime }}</span>
-                </div>
+                @if (!(sub.transportType === 'OneWay' && sub.direction === 'Afternoon')) {
+                  <div class="detail-row">
+                    <span class="detail-name">{{ t().pickupTimeLabel }}</span>
+                    <span class="detail-val">{{ sub.pickupTime }}</span>
+                  </div>
+                }
+                @if (!(sub.transportType === 'OneWay' && sub.direction === 'Morning')) {
+                  <div class="detail-row">
+                    <span class="detail-name">{{ t().dropoffTimeLabel }}</span>
+                    <span class="detail-val">{{ sub.dropoffTime }}</span>
+                  </div>
+                }
               </div>
 
               <!-- Billing and Submission Info -->
@@ -72,6 +76,18 @@
                     {{ sub.transportType === 'RoundTrip' ? t().typeRoundTrip : t().typeOneWay }}
                   </strong>
                 </div>
+                @if (sub.transportType === 'OneWay' && sub.direction) {
+                  <div class="detail-row">
+                    <span class="detail-name">{{ prefs.lang() === 'ar' ? 'الاتجاه المحدد' : 'Selected Direction' }}</span>
+                    <strong class="detail-val">
+                      {{
+                        sub.direction === 'Morning'
+                          ? (prefs.lang() === 'ar' ? 'الاصطحاب الصباحي فقط' : 'Morning Pickup Only')
+                          : (prefs.lang() === 'ar' ? 'التوصيل بعد الظهر فقط' : 'Afternoon Drop-off Only')
+                      }}
+                    </strong>
+                  </div>
+                }
                 <div class="detail-row">
                   <span class="detail-name">{{ t().monthlyFeeLabel }}</span>
                   <strong class="detail-val fee-highlight">{{ sub.fee }} JOD</strong>

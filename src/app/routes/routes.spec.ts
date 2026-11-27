@@ -156,4 +156,16 @@ describe('Routes', () => {
     expect(html).toContain('Unable to load routes');
     expect(html).not.toContain('R101');
   });
+
+  it('should render bottom CTA section with unified primary action buttons', () => {
+    fixture.detectChanges();
+    httpTesting.expectOne('/api/routes').flush([]);
+    fixture.detectChanges();
+
+    const ctaButtons = Array.from(
+      fixture.nativeElement.querySelectorAll('.cta-section .cta-actions a') as NodeListOf<HTMLAnchorElement>
+    );
+    expect(ctaButtons.length).toBe(2);
+    expect(ctaButtons.every((btn) => btn.classList.contains('btn-primary'))).toBe(true);
+  });
 });

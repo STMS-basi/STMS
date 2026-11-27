@@ -253,23 +253,24 @@
         <div class="overview-card">
           <h3>{{ translate('Bus Capacity') }}</h3>
           <div class="capacity-numbers">
-            <span>{{ capacityPercentage() | number:'1.0-0' }}%</span>
+            <span>{{ adminService.hasOccupiedCapacityData() ? ((capacityPercentage() | number:'1.0-0') + '%') : '—' }}</span>
           </div>
           <div class="capacity-bar">
-            <div class="capacity-progress" [style.width.%]="capacityPercentage()"></div>
+            <div class="capacity-progress"
+              [style.width.%]="adminService.hasOccupiedCapacityData() ? capacityPercentage() : 0"></div>
           </div>
           <p class="capacity-note">
-            {{ adminService.occupiedCapacity() }} / {{ adminService.totalCapacity() }}
+            {{ adminService.hasOccupiedCapacityData() ? adminService.occupiedCapacity() : '—' }} / {{ adminService.totalCapacity() }}
             {{ translate('Total Capacity') }}
           </p>
           <div class="capacity-details">
             <p>
               <span>{{ translate('Occupied Seats') }}</span>
-              <strong>{{ adminService.occupiedCapacity() }}</strong>
+              <strong>{{ adminService.hasOccupiedCapacityData() ? adminService.occupiedCapacity() : '—' }}</strong>
             </p>
             <p>
               <span>{{ translate('Available Seats') }}</span>
-              <strong>{{ adminService.totalCapacity() - adminService.occupiedCapacity() }}</strong>
+              <strong>{{ adminService.hasOccupiedCapacityData() ? (adminService.totalCapacity() - adminService.occupiedCapacity()) : '—' }}</strong>
             </p>
           </div>
         </div>
@@ -331,13 +332,19 @@
               <td>{{ st.parentName }}</td>
               <td>{{ st.grade }}</td>
               <td>{{ st.className }}</td>
-              <td>{{ st.routeNumber === '—' ? '—' : (st.routeNumber + (st.routeName ? ' ' + st.routeName : '')) }}</td>
+              <td>{{ formatRouteDisplay(st.routeNumber, st.routeName) }}</td>
               <td>{{ st.stopName }}</td>
               <td>{{ (st.status === 'Inactive' && st.routeNumber === '—') ? '—' : translate(st.transportType) }}</td>
               <td>
                 <span class="status-badge" [class]="getStatusClass(st.status)">
                   {{ translate(st.status) }}
                 </span>
+              </td>
+            </tr>
+            } @empty {
+            <tr class="empty-row">
+              <td colspan="8" class="table-empty-cell">
+                {{ translate(studentSearch().trim() ? 'No matching search results.' : 'No records found.') }}
               </td>
             </tr>
             }
@@ -366,7 +373,7 @@
           <thead>
             <tr>
               <th>{{ translate('Parent / Guardian') }}</th>
-              <th>Email</th>
+              <th>{{ translate('Email') }}</th>
               <th>{{ translate('Phone') }}</th>
               <th>{{ translate('Address') }}</th>
               <th>{{ translate('Students') }}</th>
@@ -380,6 +387,12 @@
               <td>{{ pr.phone }}</td>
               <td>{{ pr.address }}</td>
               <td><strong>{{ pr.studentsCount }}</strong></td>
+            </tr>
+            } @empty {
+            <tr class="empty-row">
+              <td colspan="5" class="table-empty-cell">
+                {{ translate(parentSearch().trim() ? 'No matching search results.' : 'No records found.') }}
+              </td>
             </tr>
             }
           </tbody>
@@ -470,7 +483,7 @@
               <td>{{ rt.serviceArea }}</td>
               <td>{{ rt.startPoint }}</td>
               <td>{{ rt.destination }}</td>
-              <td>{{ rt.enrolledStudents }} / {{ rt.capacity }}</td>
+              <td>{{ rt.hasEnrolledCount === false ? '—' : rt.enrolledStudents }} / {{ rt.capacity }}</td>
               <td>{{ rt.busPlate }}</td>
               <td>{{ rt.driverName }}</td>
               <td>
@@ -805,6 +818,12 @@
                 </div>
               </td>
             </tr>
+            } @empty {
+            <tr class="empty-row">
+              <td colspan="9" class="table-empty-cell">
+                {{ translate(subscriptionFilter() !== 'All' ? 'No matching results.' : 'No records found.') }}
+              </td>
+            </tr>
             }
           </tbody>
         </table>
@@ -829,16 +848,22 @@
             (click)="paymentFilter.set('Paid')">
             {{ translate('Paid') }}
           </button>
-          <button type="button" class="pill-btn" [class.active]="paymentFilter() === 'Partial'"
-            (click)="paymentFilter.set('Partial')">
-            {{ translate('Partial') }}
-          </button>
           <button type="button" class="pill-btn" [class.active]="paymentFilter() === 'Unpaid'"
             (click)="paymentFilter.set('Unpaid')">
             {{ translate('Unpaid') }}
           </button>
         </div>
       </div>
+
+      @if (legacyPartialCount() > 0) {
+      <p class="text-muted">
+        {{
+          prefs.lang() === 'ar'
+            ? 'ملاحظة: يظهر ضمن "الكل" (' + legacyPartialCount() + ') سجلات جزئية قديمة محفوظة للمراجعة من اختبارات سابقة؛ الدفع الحالي يتم بالكامل دفعة واحدة فقط.'
+            : 'Note: ' + legacyPartialCount() + ' legacy Partial record(s) from earlier tests remain visible under All for review. Current policy accepts full payment only.'
+        }}
+      </p>
+      }
 
       <div class="table-container">
         <table class="requests-table">
@@ -867,7 +892,7 @@
                   {{ translate(pm.status) }}
                 </span>
               </td>
-              <td>{{ pm.paymentDate }}</td>
+              <td>{{ pm.paymentDate === '—' ? '—' : prefs.formatDate(pm.paymentDate) }}</td>
               <td>
                 @if (pm.status === 'Paid') {
                 <span class="text-muted">{{ translate('Paid') }}</span>
@@ -884,6 +909,12 @@
                 } @else {
                 <span class="text-muted">—</span>
                 }
+              </td>
+            </tr>
+            } @empty {
+            <tr class="empty-row">
+              <td colspan="8" class="table-empty-cell">
+                {{ translate(paymentFilter() !== 'All' ? 'No matching results.' : 'No records found.') }}
               </td>
             </tr>
             }

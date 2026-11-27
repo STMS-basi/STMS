@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { RouteService } from './route.service';
 
 export type TransportType = 'OneWay' | 'RoundTrip';
+export type OneWayDirection = 'Morning' | 'Afternoon';
 export type SubscriptionStatus = 'Pending' | 'AwaitingPayment' | 'Approved' | 'Rejected';
 
 export interface SubscriptionItem {
@@ -48,6 +49,7 @@ export interface CreateSubscriptionPayload {
   readonly pickupTime: string;
   readonly dropoffTime: string;
   readonly transportType: TransportType;
+  readonly direction?: OneWayDirection | null;
   readonly fee: number;
   readonly startDate?: string;
   readonly endDate?: string;
@@ -189,9 +191,18 @@ export class SubscriptionService {
             .trim()
             .replace(/^[-–—•]\s*/, '');
 
+          const subscriptionId = Number(raw.subscriptionId ?? raw.id ?? 0);
+          const referenceNumber = String(raw.referenceNumber ?? '');
+          const localMatch = currentLocal.find(
+            (item) =>
+              (subscriptionId > 0 && item.subscriptionId === subscriptionId) ||
+              (referenceNumber &&
+                item.referenceNumber.trim().toUpperCase() === referenceNumber.trim().toUpperCase())
+          );
+
           return {
-            subscriptionId: Number(raw.subscriptionId ?? raw.id ?? 0),
-            referenceNumber: String(raw.referenceNumber ?? ''),
+            subscriptionId,
+            referenceNumber,
             studentId: Number(raw.studentId ?? 0),
             studentName: String(raw.studentName ?? raw.student ?? ''),
             studentGrade: String(raw.studentGrade ?? raw.grade ?? ''),
@@ -207,7 +218,11 @@ export class SubscriptionService {
               raw.dropoffTime ?? raw.dropOffTime ?? raw.stop?.dropoffTime ?? raw.stop?.dropOffTime ?? matchedStop?.dropoffTime ?? ''
             ),
             direction:
-              String(raw.direction ?? raw.oneWayDirection ?? raw.tripDirection ?? '').trim() || null,
+              raw.transportType === 'OneWay'
+                ? (String(raw.direction ?? raw.oneWayDirection ?? raw.tripDirection ?? '').trim() ||
+                  localMatch?.direction ||
+                  null)
+                : null,
             transportType: (raw.transportType === 'OneWay' ? 'OneWay' : 'RoundTrip') as TransportType,
             fee: Number(raw.fee ?? (raw.transportType === 'OneWay' ? 150 : 300)),
             status: (raw.status ?? 'Pending') as SubscriptionStatus,
@@ -379,6 +394,7 @@ export class SubscriptionService {
       pickupTime: payload.pickupTime,
       dropoffTime: payload.dropoffTime,
       transportType: payload.transportType,
+      direction: payload.transportType === 'OneWay' ? (payload.direction ?? null) : null,
       fee: payload.fee,
       status: 'Pending',
       startDate: payload.startDate ?? '2027-01-15',
@@ -392,11 +408,14 @@ export class SubscriptionService {
     this.persist(updated);
 
     // Dispatch real HTTP POST to /api/subscriptions
-    const requestBody = {
+    const requestBody: Record<string, unknown> = {
       studentId: payload.studentId,
       routeId: payload.routeId,
       stopId: payload.stopId,
       transportType: payload.transportType,
+      ...(payload.transportType === 'OneWay' && payload.direction
+        ? { direction: payload.direction, oneWayDirection: payload.direction }
+        : {}),
     };
 
     this.http

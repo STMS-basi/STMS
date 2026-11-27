@@ -41,7 +41,7 @@ export class AdminDashboard implements OnInit {
   public readonly studentSearch = signal('');
   public readonly parentSearch = signal('');
   public readonly subscriptionFilter = signal<'All' | 'Pending' | 'AwaitingPayment' | 'Approved' | 'Rejected'>('All');
-  public readonly paymentFilter = signal<'All' | 'Paid' | 'Partial' | 'Unpaid'>('All');
+  public readonly paymentFilter = signal<'All' | 'Paid' | 'Unpaid'>('All');
 
   public readonly showAddRoute = signal(false);
   public readonly showAddStop = signal(false);
@@ -96,13 +96,24 @@ export class AdminDashboard implements OnInit {
     if (!q) {
       return list;
     }
-    return list.filter(
-      (s) =>
+    return list.filter((s) => {
+      const routeNum = s.routeNumber !== '—' ? s.routeNumber.toLowerCase() : '';
+      const routeName = s.routeName && s.routeName !== '—' ? s.routeName.toLowerCase() : '';
+      const routeDisplay = this.formatRouteDisplay(s.routeNumber, s.routeName);
+      const normalizedDisplay = routeDisplay !== '—' ? routeDisplay.toLowerCase() : '';
+      const stopName = s.stopName && s.stopName !== '—' ? s.stopName.toLowerCase() : '';
+
+      return (
         s.fullName.toLowerCase().includes(q) ||
         s.parentName.toLowerCase().includes(q) ||
         s.grade.toLowerCase().includes(q) ||
-        s.routeNumber.toLowerCase().includes(q)
-    );
+        s.className.toLowerCase().includes(q) ||
+        routeNum.includes(q) ||
+        routeName.includes(q) ||
+        normalizedDisplay.includes(q) ||
+        stopName.includes(q)
+      );
+    });
   });
 
   public readonly filteredParents = computed(() => {
@@ -137,6 +148,10 @@ export class AdminDashboard implements OnInit {
     }
     return list.filter((p) => p.status === filter);
   });
+
+  public readonly legacyPartialCount = computed(
+    () => this.adminService.payments().filter((p) => p.status === 'Partial').length
+  );
 
   public readonly capacityPercentage = computed(() => {
     const total = this.adminService.totalCapacity();
@@ -318,6 +333,27 @@ export class AdminDashboard implements OnInit {
     'Awaiting Approval': 'بانتظار الموافقة المبدئية',
     'Pending Approval': 'قيد الموافقة',
     'Requires preliminary approval before payment': 'يتطلب موافقة مبدئية قبل تسجيل الدفع',
+    'Student Management': 'إدارة الطلاب',
+    'View and manage student transportation records.': 'عرض وإدارة سجلات النقل للطلاب.',
+    'Parent Management': 'إدارة أولياء الأمور',
+    'View registered parent and guardian records.': 'عرض سجلات أولياء الأمور والأوصياء المسجلين.',
+    'Route Management': 'إدارة المسارات',
+    'Add, edit, activate and deactivate routes.': 'إضافة وتعديل وتفعيل وتعطيل المسارات.',
+    'Stop Management': 'إدارة المواقف',
+    'Manage pickup and drop off stops.': 'إدارة مواقف الصعود والنزول.',
+    'Bus Management': 'إدارة الحافلات',
+    'Add and update buses and seating capacity.': 'إضافة وتحديث الحافلات وسعة المقاعد.',
+    'Driver Management': 'إدارة السائقين',
+    'Manage driver information and assignments.': 'إدارة معلومات السائقين وتعييناتهم.',
+    'Subscription Management': 'إدارة الاشتراكات',
+    'Review, approve, reject and update transportation subscriptions.':
+      'مراجعة والموافقة والرفض وتحديث اشتراكات النقل.',
+    'Payment Management': 'إدارة المدفوعات',
+    'Record and update payment statuses.': 'تسجيل وتحديث حالات الدفع.',
+    'Email': 'البريد الإلكتروني',
+    'No matching search results.': 'لا توجد نتائج مطابقة للبحث.',
+    'No matching results.': 'لا توجد نتائج مطابقة.',
+    'No records found.': 'لا توجد سجلات حالياً.',
     '© 2026 Basi School Transportation. All rights reserved.':
       '© 2026 مكتب الباصي للنقل المدرسي. جميع الحقوق محفوظة.',
   };
@@ -450,7 +486,18 @@ export class AdminDashboard implements OnInit {
       return;
     }
 
-    const fullAmount = payment.amountDue || matchedSub?.fee || 300;
+    const fullAmount = matchedSub
+      ? (matchedSub.fee > 0 ? matchedSub.fee : matchedSub.transportType === 'OneWay' ? 150 : 300)
+      : payment.amountDue;
+    if (!fullAmount || fullAmount <= 0) {
+      this.actionError.set(
+        this.prefs.lang() === 'ar'
+          ? 'تعذر تحديد قيمة الرسوم الكاملة للاشتراك.'
+          : 'Unable to determine full subscription fee amount.'
+      );
+      return;
+    }
+
     this.runMutation(
       `pay-${id}`,
       this.adminService.recordPayment({
@@ -476,11 +523,13 @@ export class AdminDashboard implements OnInit {
       return;
     }
 
+    const fullFee = sub.fee > 0 ? sub.fee : (sub.transportType === 'OneWay' ? 150 : 300);
+
     this.runMutation(
       `sub-pay-${sub.subscriptionId}`,
       this.adminService.recordPayment({
         subscriptionId: sub.subscriptionId,
-        amount: sub.fee,
+        amount: fullFee,
         notes: 'Full payment confirmed by admin',
       }),
       () => {

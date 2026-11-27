@@ -279,3 +279,33 @@
   color: var(--text-subtle);
   line-height: 1.5;
 }
+
+.direction-selector {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border-color);
+}
+
+.direction-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 0.75rem;
+}
+
+.direction-time {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary-text);
+}
+
+.type-card.input-error {
+  border-color: #ef4444;
+}
+
+.stop-schedule-note {
+  font-size: 0.85rem;
+  color: var(--text-emergency);
+  margin-top: 0.4rem;
+  line-height: 1.45;
+}

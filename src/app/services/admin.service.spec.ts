@@ -312,6 +312,42 @@ describe('AdminService', () => {
     expect(service.subscriptions()[0].status).toBe('Approved');
   });
 
+  it('should reject partial payment amount and keep subscription AwaitingPayment', () => {
+    service.fetchSubscriptions().subscribe();
+    httpTesting.expectOne('/api/subscriptions/admin').flush([
+      { subscriptionId: 2001, referenceNumber: 'SUB-2001', studentName: 'Ahmad', parentName: 'Ali', status: 'AwaitingPayment', transportType: 'RoundTrip', fee: 300 },
+    ]);
+
+    let receivedError: unknown;
+    service.recordPayment({ subscriptionId: 2001, amount: 200, notes: 'Partial attempt' }).subscribe({
+      error: (err) => {
+        receivedError = err;
+      },
+    });
+
+    httpTesting.expectNone('/api/payments/admin');
+    expect(receivedError).toBeTruthy();
+    expect(service.subscriptions()[0].status).toBe('AwaitingPayment');
+  });
+
+  it('should not approve subscription if backend response still shows Partial or remainingAmount > 0', () => {
+    service.fetchSubscriptions().subscribe();
+    httpTesting.expectOne('/api/subscriptions/admin').flush([
+      { subscriptionId: 2002, referenceNumber: 'SUB-2002', studentName: 'Layan', parentName: 'Ali', status: 'AwaitingPayment', transportType: 'OneWay', fee: 150 },
+    ]);
+
+    service.recordPayment({ subscriptionId: 2002, amount: 150 }).subscribe();
+    httpTesting.expectOne('/api/payments/admin').flush({
+      paymentId: 88,
+      subscriptionId: 2002,
+      paymentStatus: 'Partial',
+      subscriptionStatus: 'AwaitingPayment',
+      remainingAmount: 30,
+    });
+
+    expect(service.subscriptions()[0].status).toBe('AwaitingPayment');
+  });
+
   it('should map student route and status accurately without fake defaults', () => {
     service.fetchSubscriptions().subscribe();
     httpTesting.expectOne('/api/subscriptions/admin').flush([
@@ -334,5 +370,134 @@ describe('AdminService', () => {
       { studentId: 101, fullName: 'Yousef Al Basi', grade: 'Grade 5', className: '5A' },
       { studentId: 999, fullName: 'Unsubscribed Student', grade: 'Grade 1', className: '1A' },
     ]);
+  });
+
+  it('should populate student route from Approved subscription routeId and stopId even when /api/students/admin omits route fields', () => {
+    service.fetchStudents().subscribe();
+    httpTesting.expectOne('/api/students/admin').flush([
+      { studentId: 71, fullName: 'Capacity Test Student Two', grade: '5', className: 'A', parentId: 21, parentName: 'Test Parent' },
+      { studentId: 72, fullName: 'Stop Fallback Student', grade: '4', className: 'B', parentId: 21, parentName: 'Test Parent' },
+    ]);
+
+    service.fetchSubscriptions().subscribe();
+    httpTesting.expectOne('/api/subscriptions/admin').flush([
+      {
+        subscriptionId: 101,
+        studentId: 71,
+        routeId: 45,
+        stopId: 62,
+        stopName: 'R26 Test Stop',
+        transportType: 'OneWay',
+        status: 'Approved',
+      },
+      {
+        subscriptionId: 102,
+        studentId: 72,
+        stopId: 62,
+        stopName: 'R26 Test Stop',
+        transportType: 'RoundTrip',
+        status: 'Approved',
+      },
+    ]);
+
+    service.fetchStops().subscribe();
+    httpTesting.expectOne('/api/stops/admin').flush([
+      { stopId: 62, routeId: 45, name: 'R26 Test Stop', stopOrder: 1 },
+    ]);
+
+    service.fetchRoutes().subscribe();
+    httpTesting.expectOne('/api/routes/admin').flush([
+      { routeId: 45, routeNumber: 'TEST-ACTIVE-01', name: 'Active Driver and Bus Test', capacity: 25, enrolledStudents: 2, isActive: true },
+    ]);
+
+    const s71 = service.students().find((s) => s.studentId === 71)!;
+    expect(s71.routeNumber).toBe('TEST-ACTIVE-01');
+    expect(s71.routeName).toBe('Active Driver and Bus Test');
+    expect(s71.stopName).toBe('R26 Test Stop');
+    expect(s71.status).toBe('Active');
+
+    const s72 = service.students().find((s) => s.studentId === 72)!;
+    expect(s72.routeNumber).toBe('TEST-ACTIVE-01');
+    expect(s72.routeName).toBe('Active Driver and Bus Test');
+    expect(s72.status).toBe('Active');
+  });
+
+  it('should compute unique Approved enrolledStudents per route when /api/routes/admin omits counts and mark unavailable if subscriptions fail', () => {
+    service.fetchRoutes().subscribe();
+    httpTesting.expectOne('/api/routes/admin').flush([
+      { routeId: 45, routeNumber: 'TEST-ACTIVE-01', name: 'Active Driver and Bus Test', capacity: 20, isActive: true },
+    ]);
+
+    // Before subscriptions load, route has no known enrolled count (do not report false 0)
+    expect(service.routes()[0].hasEnrolledCount).toBe(false);
+    expect(service.hasOccupiedCapacityData()).toBe(false);
+
+    // If subscriptions endpoint fails, keep hasEnrolledCount as false
+    service.fetchSubscriptions().subscribe();
+    httpTesting.expectOne('/api/subscriptions/admin').flush({ message: 'Server error' }, { status: 500, statusText: 'Error' });
+    expect(service.routes()[0].hasEnrolledCount).toBe(false);
+    expect(service.hasOccupiedCapacityData()).toBe(false);
+
+    // Once subscriptions load cleanly, count unique students with Approved subscriptions for each route
+    service.fetchSubscriptions().subscribe();
+    httpTesting.expectOne('/api/subscriptions/admin').flush([
+      { subscriptionId: 101, studentId: 71, studentName: 'Capacity Test Student Two', routeId: 45, status: 'Approved' },
+      { subscriptionId: 102, studentId: 71, studentName: 'Capacity Test Student Two', routeId: 45, status: 'Approved' },
+      { subscriptionId: 103, studentId: 72, studentName: 'Pending Student', routeId: 45, status: 'Pending' },
+      { subscriptionId: 104, studentId: 73, studentName: 'Rejected Student', routeId: 45, status: 'Rejected' },
+      { subscriptionId: 105, studentId: 74, studentName: 'Awaiting Student', routeId: 45, status: 'AwaitingPayment' },
+    ]);
+
+    expect(service.routes()[0].hasEnrolledCount).toBe(true);
+    expect(service.routes()[0].enrolledStudents).toBe(1);
+    expect(service.hasOccupiedCapacityData()).toBe(true);
+    expect(service.occupiedCapacity()).toBe(1);
+  });
+
+  it('should resolve student route even when subscription has routeId 0 or dash placeholders and string route field', () => {
+    service.fetchRoutes().subscribe();
+    httpTesting.expectOne('/api/routes/admin').flush([
+      { routeId: 1, routeNumber: 'R1', name: 'Abdoun Line', capacity: 30, isActive: true },
+    ]);
+
+    service.fetchStops().subscribe();
+    httpTesting.expectOne('/api/stops/admin').flush([
+      { stopId: 11, routeId: 1, name: 'Abdoun Circle', stopOrder: 1 },
+    ]);
+
+    service.fetchSubscriptions().subscribe();
+    httpTesting.expectOne('/api/subscriptions/admin').flush([
+      {
+        subscriptionId: 301,
+        studentId: 1,
+        studentName: 'Yazan Ahmad',
+        routeId: 0,
+        routeNumber: '-',
+        routeName: '—',
+        stopName: 'Abdoun Circle',
+        status: 'Approved',
+      },
+      {
+        subscriptionId: 302,
+        studentId: 2,
+        studentName: 'Rama Ahmad',
+        route: 'Abdoun Line',
+        status: 'Approved',
+      },
+    ]);
+
+    service.fetchStudents().subscribe();
+    httpTesting.expectOne('/api/students/admin').flush([
+      { studentId: 1, fullName: 'Yazan Ahmad', grade: 'Grade 5', className: 'A' },
+      { studentId: 2, fullName: 'Rama Ahmad', grade: 'Grade 3', className: 'B' },
+    ]);
+
+    const yazan = service.students().find((s) => s.studentId === 1)!;
+    expect(yazan.routeNumber).toBe('R1');
+    expect(yazan.routeName).toBe('Abdoun Line');
+
+    const rama = service.students().find((s) => s.studentId === 2)!;
+    expect(rama.routeNumber).toBe('R1');
+    expect(rama.routeName).toBe('Abdoun Line');
   });
 });

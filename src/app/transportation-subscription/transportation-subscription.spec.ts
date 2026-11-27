@@ -254,4 +254,259 @@ describe('TransportationSubscription', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Child Of Parent A');
     expect(fixture.nativeElement.textContent).toContain(fixture.componentInstance['t']().noRegisteredStudentsWarning);
   });
+
+  it('should filter eligibleRoutes strictly by active status, qualified bus & driver, and seat availability', () => {
+    const fixture = TestBed.createComponent(TransportationSubscription);
+    fixture.detectChanges();
+
+    httpTesting.expectOne('/api/subscriptions/registration-info').flush({ registrationOpen: true });
+    httpTesting.expectOne('/api/routes').flush([
+      {
+        routeId: 10,
+        routeNumber: 'R1',
+        name: 'Eligible Route',
+        startPoint: 'A',
+        destination: 'School',
+        serviceArea: 'West Amman',
+        capacity: 30,
+        enrolledStudents: 10,
+        isActive: true,
+        busId: 1,
+        driverId: 2,
+        stops: [],
+      },
+      {
+        routeId: 11,
+        routeNumber: 'R2',
+        name: 'Inactive Route',
+        startPoint: 'A',
+        destination: 'School',
+        serviceArea: 'North Amman',
+        capacity: 30,
+        enrolledStudents: 0,
+        isActive: false,
+        busId: 3,
+        driverId: 4,
+        stops: [],
+      },
+      {
+        routeId: 12,
+        routeNumber: 'R3',
+        name: 'No Bus Route',
+        startPoint: 'A',
+        destination: 'School',
+        serviceArea: 'East Amman',
+        capacity: 30,
+        enrolledStudents: 5,
+        isActive: true,
+        busId: null,
+        driverId: 5,
+        stops: [],
+      },
+      {
+        routeId: 13,
+        routeNumber: 'R4',
+        name: 'No Driver Route',
+        startPoint: 'A',
+        destination: 'School',
+        serviceArea: 'South Amman',
+        capacity: 30,
+        enrolledStudents: 5,
+        isActive: true,
+        busId: 6,
+        driverId: null,
+        stops: [],
+      },
+      {
+        routeId: 14,
+        routeNumber: 'R5',
+        name: 'Inactive Driver Route',
+        startPoint: 'A',
+        destination: 'School',
+        serviceArea: 'Downtown',
+        capacity: 30,
+        enrolledStudents: 5,
+        isActive: true,
+        busId: 7,
+        driverId: 8,
+        driverIsActive: false,
+        stops: [],
+      },
+      {
+        routeId: 15,
+        routeNumber: 'R6',
+        name: 'Full Route',
+        startPoint: 'A',
+        destination: 'School',
+        serviceArea: 'West Amman',
+        capacity: 25,
+        enrolledStudents: 25,
+        isActive: true,
+        busId: 9,
+        driverId: 10,
+        stops: [],
+      },
+      {
+        routeId: 16,
+        routeNumber: 'TEST-16',
+        name: 'TEST Qualified Route',
+        startPoint: 'A',
+        destination: 'School',
+        serviceArea: 'North Amman',
+        capacity: 20,
+        enrolledStudents: 2,
+        isActive: true,
+        busId: 11,
+        driverId: 12,
+        stops: [],
+      },
+    ]);
+
+    const eligible = fixture.componentInstance.eligibleRoutes().map((r) => r.routeId);
+    expect(eligible).toEqual([10, 16]);
+  });
+
+  it('should require and submit OneWay direction choice (Morning Pickup Only or Afternoon Drop-off Only)', () => {
+    const fixture = TestBed.createComponent(TransportationSubscription);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+
+    studentService.addStudent({
+      fullName: 'Omar Student',
+      grade: 'Grade 4',
+      className: '4A',
+    }).subscribe();
+    const student = studentService.students().find((s) => s.fullName === 'Omar Student')!;
+
+    component['subForm'].patchValue({
+      studentId: student.studentId,
+      routeId: 1,
+      stopId: 101,
+    });
+    fixture.detectChanges();
+
+    // RoundTrip should NOT render direction selector
+    expect(fixture.nativeElement.querySelector('.direction-selector')).toBeNull();
+
+    // Switching to OneWay renders Morning Pickup Only and Afternoon Drop-off Only options
+    component.selectTransportType('OneWay');
+    fixture.detectChanges();
+
+    const directionEl = fixture.nativeElement.querySelector('.direction-selector') as HTMLElement;
+    expect(directionEl).toBeTruthy();
+    expect(directionEl.textContent).toContain('Morning Pickup Only');
+    expect(directionEl.textContent).toContain('Afternoon Drop-off Only');
+
+    // Submitting OneWay without selecting a direction must block submission and show validation error
+    component['onSubmit']();
+    fixture.detectChanges();
+    expect(component['isDirectionInvalid']()).toBe(true);
+    expect(subscriptionService.subscriptions().length).toBe(0);
+
+    // Selecting Afternoon Drop-off Only enables submission and persists direction
+    component.selectOneWayDirection('Afternoon');
+    fixture.detectChanges();
+    expect(component['isDirectionInvalid']()).toBe(false);
+    expect(fixture.nativeElement.querySelector('.summary-card')?.textContent).toContain('Afternoon Drop-off Only');
+
+    // Verify Arabic labels render properly
+    prefsService.setLanguage('ar');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.direction-selector')?.textContent).toContain('الاصطحاب الصباحي فقط');
+    expect(fixture.nativeElement.querySelector('.direction-selector')?.textContent).toContain('التوصيل بعد الظهر فقط');
+
+    prefsService.setLanguage('en');
+    fixture.detectChanges();
+
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    component['onSubmit']();
+    expect(subscriptionService.subscriptions().length).toBe(1);
+    expect(subscriptionService.subscriptions()[0].transportType).toBe('OneWay');
+    expect(subscriptionService.subscriptions()[0].direction).toBe('Afternoon');
+    expect(navigateSpy).toHaveBeenCalled();
+
+    const postReq = httpTesting.expectOne('/api/subscriptions');
+    expect(postReq.request.body).toEqual({
+      studentId: student.studentId,
+      routeId: 1,
+      stopId: 101,
+      transportType: 'OneWay',
+      direction: 'Afternoon',
+      oneWayDirection: 'Afternoon',
+    });
+    postReq.flush({ subscriptionId: 901, referenceNumber: 'SUB 2026 901' });
+  });
+
+  it('should disable stops without scheduled times and block submission with clear notices', () => {
+    const fixture = TestBed.createComponent(TransportationSubscription);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+
+    httpTesting.expectOne('/api/subscriptions/registration-info').flush({ registrationOpen: true });
+    httpTesting.expectOne('/api/routes').flush([
+      {
+        routeId: 2,
+        routeNumber: 'R2',
+        name: 'Jubeiha Line',
+        startPoint: 'University Street',
+        destination: 'School',
+        serviceArea: 'North Amman',
+        capacity: 25,
+        enrolledStudents: 0,
+        isActive: true,
+        busId: 1,
+        driverId: 1,
+        stops: [],
+      },
+    ]);
+
+    studentService.addStudent({
+      fullName: 'Tariq Student',
+      grade: 'Grade 4',
+      className: '4A',
+    }).subscribe();
+    httpTesting.expectOne('/api/students').flush({
+      studentId: 10,
+      fullName: 'Tariq Student',
+      grade: 'Grade 4',
+      className: '4A',
+    });
+    const student = studentService.students().find((s) => s.fullName === 'Tariq Student')!;
+
+    component['subForm'].patchValue({ studentId: student.studentId, routeId: 2 });
+    httpTesting.expectOne('/api/stops/route/2').flush([
+      { stopId: 201, name: 'University Street', stopOrder: 1, pickupTime: '', dropoffTime: '' },
+      { stopId: 202, name: 'Jubeiha Circle', stopOrder: 2, pickupTime: '06:55', dropoffTime: '14:15' },
+    ]);
+    fixture.detectChanges();
+
+    const options = Array.from(
+      fixture.nativeElement.querySelectorAll('#stopId option') as NodeListOf<HTMLOptionElement>
+    );
+    const uniOption = options.find((o) => o.textContent?.includes('University Street'))!;
+    const circleOption = options.find((o) => o.textContent?.includes('Jubeiha Circle'))!;
+
+    expect(uniOption.disabled).toBe(true);
+    expect(uniOption.textContent).toContain('Schedule not set (unavailable)');
+    expect(uniOption.textContent).not.toMatch(/:\s*$/);
+
+    expect(circleOption.disabled).toBe(false);
+    expect(circleOption.textContent).toContain('06:55');
+    expect(circleOption.textContent).toContain('14:15');
+    expect(component.hasUnscheduledStops()).toBe(true);
+
+    // Arabic note & disabled label check
+    prefsService.setLanguage('ar');
+    fixture.detectChanges();
+    expect(uniOption.textContent).toContain('المواعيد غير محددة');
+    expect(fixture.nativeElement.textContent).toContain('غير متاحة للاختيار لحين تسجيل مواعيد الصعود والنزول');
+
+    // Defensive check: if an unscheduled stop were ever programmatically selected, block submission
+    component['subForm'].patchValue({ stopId: 201 });
+    fixture.detectChanges();
+    expect(component.selectedStopMissingSchedule()).toBe(true);
+    component['onSubmit']();
+    expect(component['errorMessage']()).toContain('لا تحتوي على مواعيد صعود أو نزول محددة');
+    expect(subscriptionService.subscriptions().length).toBe(0);
+  });
 });

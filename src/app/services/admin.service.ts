@@ -15,6 +15,8 @@ export type AdminResource =
 export interface AdminStudentItem {
   readonly studentId: number;
   readonly parentId?: number;
+  readonly routeId?: number;
+  readonly stopId?: number;
   readonly fullName: string;
   readonly parentName: string;
   readonly parentEmail: string;
@@ -46,6 +48,7 @@ export interface AdminRouteItem {
   readonly serviceArea: string;
   readonly capacity: number;
   readonly enrolledStudents: number;
+  readonly hasEnrolledCount?: boolean;
   readonly isActive: boolean;
   readonly busId?: number;
   readonly busPlate: string;
@@ -140,6 +143,7 @@ export class AdminService {
   private readonly rawBusesSignal = signal<AdminBusItem[]>([]);
   private readonly rawDriversSignal = signal<AdminDriverItem[]>([]);
   private readonly rawSubscriptionsSignal = signal<AdminSubscriptionItem[]>([]);
+  private readonly hasLoadedSubscriptionsSignal = signal(false);
   private readonly rawPaymentsSignal = signal<AdminPaymentItem[]>([]);
   private readonly rawStudentsSignal = signal<AdminStudentItem[]>([]);
   private readonly rawParentsSignal = signal<AdminParentItem[]>([]);
@@ -154,6 +158,9 @@ export class AdminService {
   public readonly routes = computed<AdminRouteItem[]>(() => {
     const buses = this.rawBusesSignal();
     const drivers = this.rawDriversSignal();
+    const subs = this.subscriptions();
+    const rawStudents = this.rawStudentsSignal();
+    const subsLoaded = this.hasLoadedSubscriptionsSignal();
 
     return this.rawRoutesSignal().map((r) => {
       let busPlate = r.busPlate !== '—' ? r.busPlate : '';
@@ -177,8 +184,18 @@ export class AdminService {
         driverName = matchedDriver.fullName;
       }
 
+      const derivedCount = subsLoaded
+        ? this.countApprovedStudentsForRoute(r, subs, rawStudents)
+        : 0;
+      const hasEnrolledCount = Boolean(r.hasEnrolledCount || subsLoaded);
+      const enrolledStudents = r.hasEnrolledCount
+        ? (subsLoaded ? Math.max(r.enrolledStudents, derivedCount) : r.enrolledStudents)
+        : derivedCount;
+
       return {
         ...r,
+        enrolledStudents,
+        hasEnrolledCount,
         busPlate: busPlate || '—',
         driverName: driverName || '—',
       };
@@ -278,7 +295,9 @@ export class AdminService {
 
   public readonly students = computed<AdminStudentItem[]>(() => {
     const parents = this.rawParentsSignal();
-    const subs = this.rawSubscriptionsSignal();
+    const subs = this.subscriptions();
+    const routes = this.rawRoutesSignal();
+    const stops = this.rawStopsSignal();
 
     return this.rawStudentsSignal().map((st) => {
       let parentName = st.parentName;
@@ -296,26 +315,51 @@ export class AdminService {
         }
       }
 
-      const studentSubs = subs.filter(
-        (s) =>
-          (st.studentId > 0 && s.studentId === st.studentId) ||
-          (s.studentName !== '—' && s.studentName.toLowerCase() === st.fullName.toLowerCase())
-      );
+      const studentSubs = subs.filter((s) => {
+        if (st.studentId > 0 && s.studentId && s.studentId > 0) {
+          return s.studentId === st.studentId;
+        }
+        return (
+          s.studentName !== '—' &&
+          s.studentName.trim().toLowerCase() === st.fullName.trim().toLowerCase()
+        );
+      });
 
-      // Prefer non-rejected subscription when matching current student status
+      const hasRouteInfo = (s: AdminSubscriptionItem): boolean =>
+        s.routeNumber !== '—' ||
+        (s.routeName !== '—' && s.routeName.trim().length > 0) ||
+        Boolean(s.routeId && s.routeId > 0);
+
+      // Prefer Approved subscription for current active route assignment, then pending/awaiting payment
       const matchedSub =
+        studentSubs.find((s) => s.status === 'Approved' && hasRouteInfo(s)) ??
         studentSubs.find((s) => s.status === 'Approved') ??
         studentSubs.find((s) => s.status === 'Pending' || s.status === 'AwaitingPayment') ??
         studentSubs[0];
 
       if (matchedSub) {
+        const resolvedSub = this.resolveRouteAndStop(
+          {
+            routeId: (matchedSub.routeId && matchedSub.routeId > 0 ? matchedSub.routeId : undefined) ?? st.routeId,
+            stopId: (matchedSub.stopId && matchedSub.stopId > 0 ? matchedSub.stopId : undefined) ?? st.stopId,
+            routeNumber: matchedSub.routeNumber !== '—' ? matchedSub.routeNumber : st.routeNumber,
+            routeName: matchedSub.routeName !== '—' ? matchedSub.routeName : st.routeName,
+            stopName: matchedSub.stopName !== '—' ? matchedSub.stopName : st.stopName,
+          },
+          routes,
+          stops,
+          ''
+        );
+
         return {
           ...st,
           parentName,
           parentEmail,
-          routeNumber: matchedSub.routeNumber || '—',
-          routeName: matchedSub.routeName !== '—' ? matchedSub.routeName : '',
-          stopName: matchedSub.stopName || '—',
+          routeId: resolvedSub.routeId,
+          stopId: resolvedSub.stopId,
+          routeNumber: resolvedSub.routeNumber,
+          routeName: resolvedSub.routeName,
+          stopName: resolvedSub.stopName,
           transportType: matchedSub.transportType,
           status:
             matchedSub.status === 'Approved'
@@ -326,16 +370,34 @@ export class AdminService {
         };
       }
 
+      const resolved = this.resolveRouteAndStop(
+        {
+          routeId: st.routeId,
+          stopId: st.stopId,
+          routeNumber: st.routeNumber,
+          routeName: st.routeName,
+          stopName: st.stopName,
+        },
+        routes,
+        stops,
+        ''
+      );
+
       return {
         ...st,
         parentName,
         parentEmail,
+        routeId: resolved.routeId,
+        stopId: resolved.stopId,
+        routeNumber: resolved.routeNumber,
+        routeName: resolved.routeName,
+        stopName: resolved.stopName,
       };
     });
   });
 
   public readonly subscriptions = computed<AdminSubscriptionItem[]>(() => {
-    const students = this.students();
+    const rawStudents = this.rawStudentsSignal();
     const parents = this.rawParentsSignal();
     const routes = this.rawRoutesSignal();
     const stops = this.rawStopsSignal();
@@ -344,45 +406,48 @@ export class AdminService {
       let parentName = sub.parentName;
 
       if (parentName === '—') {
-        const matchedStudent = students.find(
-          (st) =>
-            (sub.studentId && st.studentId === sub.studentId) ||
-            (sub.studentName !== '—' && st.fullName.toLowerCase() === sub.studentName.toLowerCase())
-        );
+        const matchedStudent = rawStudents.find((st) => {
+          if (sub.studentId && sub.studentId > 0 && st.studentId > 0) {
+            return st.studentId === sub.studentId;
+          }
+          return sub.studentName !== '—' && st.fullName.toLowerCase() === sub.studentName.toLowerCase();
+        });
         if (matchedStudent && matchedStudent.parentName !== '—') {
           parentName = matchedStudent.parentName;
-        } else if (sub.parentId) {
-          const matchedParent = parents.find((p) => p.parentId === sub.parentId);
+        } else {
+          const targetParentId = sub.parentId ?? matchedStudent?.parentId;
+          const matchedParent =
+            (targetParentId ? parents.find((p) => p.parentId === targetParentId) : undefined) ??
+            (matchedStudent?.parentEmail
+              ? parents.find((p) => p.email && p.email.toLowerCase() === matchedStudent.parentEmail.toLowerCase())
+              : undefined);
           if (matchedParent && matchedParent.fullName !== '—') {
             parentName = matchedParent.fullName;
           }
         }
       }
 
-      let routeNumber = sub.routeNumber;
-      let routeName = sub.routeName;
-      if ((routeNumber === '—' || routeName === '—') && sub.routeId) {
-        const matchedRoute = routes.find((r) => r.routeId === sub.routeId);
-        if (matchedRoute) {
-          routeNumber = routeNumber === '—' ? matchedRoute.routeNumber : routeNumber;
-          routeName = routeName === '—' ? matchedRoute.name : routeName;
-        }
-      }
-
-      let stopName = sub.stopName;
-      if (stopName === '—' && sub.stopId) {
-        const matchedStop = stops.find((st) => st.stopId === sub.stopId);
-        if (matchedStop) {
-          stopName = matchedStop.name;
-        }
-      }
+      const resolved = this.resolveRouteAndStop(
+        {
+          routeId: sub.routeId,
+          stopId: sub.stopId,
+          routeNumber: sub.routeNumber,
+          routeName: sub.routeName,
+          stopName: sub.stopName,
+        },
+        routes,
+        stops,
+        '—'
+      );
 
       return {
         ...sub,
+        routeId: resolved.routeId,
+        stopId: resolved.stopId,
         parentName: parentName || '—',
-        routeNumber: routeNumber || '—',
-        routeName: routeName || '—',
-        stopName: stopName || '—',
+        routeNumber: resolved.routeNumber,
+        routeName: resolved.routeName,
+        stopName: resolved.stopName,
       };
     });
   });
@@ -475,6 +540,59 @@ export class AdminService {
       .reduce((sum, r) => sum + r.enrolledStudents, 0)
   );
 
+  public readonly hasOccupiedCapacityData = computed(() => {
+    const activeRoutes = this.routes().filter((r) => r.isActive);
+    if (activeRoutes.length === 0) {
+      return true;
+    }
+    return activeRoutes.every((r) => r.hasEnrolledCount !== false);
+  });
+
+  private countApprovedStudentsForRoute(
+    route: AdminRouteItem,
+    subs: readonly AdminSubscriptionItem[],
+    rawStudents: readonly AdminStudentItem[]
+  ): number {
+    const uniqueStudents = new Set<string>();
+
+    for (const sub of subs) {
+      if (sub.status !== 'Approved') {
+        continue;
+      }
+
+      const matchesRoute =
+        sub.routeId !== undefined && sub.routeId > 0 && route.routeId > 0
+          ? sub.routeId === route.routeId
+          : (sub.routeNumber !== '—' &&
+              route.routeNumber !== '—' &&
+              sub.routeNumber.toLowerCase() === route.routeNumber.toLowerCase()) ||
+            (sub.routeName !== '—' &&
+              route.name !== '—' &&
+              sub.routeName.toLowerCase() === route.name.toLowerCase());
+
+      if (!matchesRoute) {
+        continue;
+      }
+
+      let key = '';
+      if (sub.studentId !== undefined && sub.studentId > 0) {
+        key = `id:${sub.studentId}`;
+      } else if (sub.studentName && sub.studentName !== '—') {
+        const normalizedName = sub.studentName.trim().toLowerCase();
+        const matchedStudent = rawStudents.find(
+          (st) => st.studentId > 0 && st.fullName.trim().toLowerCase() === normalizedName
+        );
+        key = matchedStudent ? `id:${matchedStudent.studentId}` : `name:${normalizedName}`;
+      } else {
+        key = `sub:${sub.subscriptionId}`;
+      }
+
+      uniqueStudents.add(key);
+    }
+
+    return uniqueStudents.size;
+  }
+
   private clearLegacyStorage(): void {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
@@ -506,6 +624,69 @@ export class AdminService {
         return next;
       });
     }
+  }
+
+  private resolveRouteAndStop(
+    item: {
+      routeId?: number;
+      stopId?: number;
+      routeNumber: string;
+      routeName: string;
+      stopName: string;
+    },
+    routes: readonly AdminRouteItem[],
+    stops: readonly AdminStopItem[],
+    emptyRouteName: string
+  ): {
+    routeId?: number;
+    stopId?: number;
+    routeNumber: string;
+    routeName: string;
+    stopName: string;
+  } {
+    let stopName = item.stopName;
+    const stopIdVal = item.stopId && item.stopId > 0 ? item.stopId : undefined;
+    const matchedStop =
+      (stopIdVal ? stops.find((sp) => sp.stopId === stopIdVal) : undefined) ??
+      (stopName !== '—' ? stops.find((sp) => sp.name.trim().toLowerCase() === stopName.trim().toLowerCase()) : undefined);
+    if (stopName === '—' && matchedStop) {
+      stopName = matchedStop.name;
+    }
+
+    const explicitRouteId = item.routeId && item.routeId > 0 ? item.routeId : undefined;
+    const effectiveRouteId = explicitRouteId ?? matchedStop?.routeId;
+    let routeNumber = item.routeNumber;
+    let routeName = item.routeName;
+    if (routeNumber === '—' || !routeName || routeName === '—') {
+      const matchedRoute =
+        (effectiveRouteId ? routes.find((r) => r.routeId === effectiveRouteId) : undefined) ??
+        (routeNumber !== '—'
+          ? routes.find((r) => r.routeNumber.toLowerCase() === routeNumber.toLowerCase())
+          : undefined) ??
+        (routeName && routeName !== '—'
+          ? routes.find((r) => r.name.toLowerCase() === routeName.toLowerCase())
+          : undefined) ??
+        (matchedStop?.routeNumber && matchedStop.routeNumber !== '—'
+          ? routes.find((r) => r.routeNumber.toLowerCase() === matchedStop.routeNumber.toLowerCase())
+          : undefined);
+
+      if (matchedRoute) {
+        routeNumber = routeNumber === '—' ? matchedRoute.routeNumber : routeNumber;
+        if (!routeName || routeName === '—') {
+          routeName = matchedRoute.name !== '—' ? matchedRoute.name : emptyRouteName;
+        }
+      } else if (routeNumber === '—' && matchedStop?.routeNumber && matchedStop.routeNumber !== '—') {
+        routeNumber = matchedStop.routeNumber;
+      }
+    }
+
+    return {
+      routeId: effectiveRouteId,
+      stopId: stopIdVal ?? matchedStop?.stopId,
+      routeNumber: routeNumber || '—',
+      routeName: routeName || emptyRouteName,
+      stopName: stopName || '—',
+    };
   }
 
   private formatRouteLabel(routeNumber: string, routeName: string): string {
@@ -958,7 +1139,9 @@ export class AdminService {
     return this.http.get<unknown[]>('/api/subscriptions/admin').pipe(
       tap((items) => {
         this.clearResourceError('subscriptions');
-        const mapped = Array.isArray(items)
+        const isValidArray = Array.isArray(items);
+        this.hasLoadedSubscriptionsSignal.set(isValidArray);
+        const mapped = isValidArray
           ? items.map((i) => this.mapSubscription(i as Record<string, unknown>))
           : [];
         this.rawSubscriptionsSignal.set(mapped);
@@ -967,6 +1150,7 @@ export class AdminService {
       catchError((err) => {
         console.error('Failed to fetch subscriptions from /api/subscriptions/admin', err);
         this.setResourceError('subscriptions', err);
+        this.hasLoadedSubscriptionsSignal.set(false);
         this.rawSubscriptionsSignal.set([]);
         return of([]);
       })
@@ -1024,8 +1208,14 @@ export class AdminService {
 
     const routeObj = this.asRecord(item['route'] ?? item['Route']);
     const stopObj = this.asRecord(item['stop'] ?? item['Stop']);
+    const routeId =
+      this.pickNumber(item, ['routeId', 'RouteId']) ??
+      (routeObj ? this.pickNumber(routeObj, ['routeId', 'RouteId', 'id', 'Id']) : undefined);
+    const stopId =
+      this.pickNumber(item, ['stopId', 'StopId']) ??
+      (stopObj ? this.pickNumber(stopObj, ['stopId', 'StopId', 'id', 'Id']) : undefined);
     const routeNumber =
-      this.pickString(item, ['routeNumber', 'RouteNumber']) ||
+      this.pickString(item, ['routeNumber', 'RouteNumber', 'routeCode', 'RouteCode']) ||
       (routeObj ? this.pickString(routeObj, ['routeNumber', 'RouteNumber']) : '') ||
       '—';
     const routeName =
@@ -1051,6 +1241,8 @@ export class AdminService {
     return {
       studentId,
       parentId,
+      routeId,
+      stopId,
       fullName,
       parentName,
       parentEmail,
@@ -1072,8 +1264,16 @@ export class AdminService {
     const destination = this.pickString(item, ['destination', 'Destination']) || '—';
     const serviceArea = this.pickString(item, ['serviceArea', 'ServiceArea']) || '—';
     const capacity = this.pickNumber(item, ['capacity', 'Capacity']) ?? 0;
-    const enrolledStudents =
-      this.pickNumber(item, ['enrolledStudents', 'EnrolledStudents', 'studentCount', 'studentsCount']) ?? 0;
+    const explicitEnrolled = this.pickNumber(item, [
+      'enrolledStudents',
+      'EnrolledStudents',
+      'studentCount',
+      'studentsCount',
+      'activeStudentsCount',
+      'occupiedSeats',
+    ]);
+    const hasEnrolledCount = explicitEnrolled !== undefined;
+    const enrolledStudents = explicitEnrolled ?? 0;
 
     let isActive = true;
     if (typeof item['isActive'] === 'boolean') {
@@ -1114,6 +1314,7 @@ export class AdminService {
       serviceArea,
       capacity,
       enrolledStudents,
+      hasEnrolledCount,
       isActive,
       busId,
       busPlate,
@@ -1156,17 +1357,20 @@ export class AdminService {
 
     const parentName = this.extractParentName(item, studentObj) || '—';
 
+    const dashIgnore = ['—', '-', 'n/a', 'none'];
+    const routeStr = typeof item['route'] === 'string' ? (item['route'] as string).trim() : '';
     const routeNumber =
-      this.pickString(item, ['routeNumber', 'RouteNumber']) ||
-      (routeObj ? this.pickString(routeObj, ['routeNumber', 'RouteNumber']) : '') ||
+      this.pickString(item, ['routeNumber', 'RouteNumber', 'routeCode', 'RouteCode'], dashIgnore) ||
+      (routeObj ? this.pickString(routeObj, ['routeNumber', 'RouteNumber', 'routeCode'], dashIgnore) : '') ||
       '—';
     const routeName =
-      this.pickString(item, ['routeName', 'RouteName']) ||
-      (routeObj ? this.pickString(routeObj, ['name', 'Name', 'routeName']) : '') ||
+      this.pickString(item, ['routeName', 'RouteName', 'routeTitle', 'RouteTitle'], dashIgnore) ||
+      (routeObj ? this.pickString(routeObj, ['name', 'Name', 'routeName'], dashIgnore) : '') ||
+      (routeStr && !dashIgnore.includes(routeStr.toLowerCase()) ? routeStr : '') ||
       '—';
     const stopName =
-      this.pickString(item, ['stopName', 'StopName']) ||
-      (stopObj ? this.pickString(stopObj, ['name', 'Name', 'stopName']) : '') ||
+      this.pickString(item, ['stopName', 'StopName'], dashIgnore) ||
+      (stopObj ? this.pickString(stopObj, ['name', 'Name', 'stopName'], dashIgnore) : '') ||
       '—';
 
     const rawType = this.pickString(item, ['transportType', 'TransportType']);
@@ -1264,9 +1468,9 @@ export class AdminService {
     const amountPaid = explicitPaid !== undefined ? explicitPaid : rawStatus === 'Paid' ? amountDue : 0;
 
     let status: 'Unpaid' | 'Partial' | 'Paid' = 'Unpaid';
-    if (rawStatus === 'Paid' || (amountDue > 0 && amountPaid >= amountDue)) {
+    if ((rawStatus === 'Paid' && (amountDue <= 0 || amountPaid >= amountDue)) || (amountDue > 0 && amountPaid >= amountDue)) {
       status = 'Paid';
-    } else if (rawStatus === 'Partial' || amountPaid > 0) {
+    } else if (rawStatus === 'Partial' || (amountPaid > 0 && (amountDue <= 0 || amountPaid < amountDue))) {
       status = 'Partial';
     }
 
@@ -1293,10 +1497,42 @@ export class AdminService {
   }
 
   public recordPayment(req: { subscriptionId: number; amount: number; notes?: string }): Observable<unknown> {
+    const targetSub = this.subscriptions().find((s) => s.subscriptionId === req.subscriptionId);
+    if (targetSub && targetSub.status !== 'AwaitingPayment') {
+      return throwError(() => new Error('Only subscriptions awaiting payment can be confirmed as paid.'));
+    }
+
+    const expectedFee = targetSub
+      ? (targetSub.fee > 0 ? targetSub.fee : targetSub.transportType === 'OneWay' ? 150 : 300)
+      : undefined;
+
+    if (typeof req.amount !== 'number' || Number.isNaN(req.amount) || req.amount <= 0) {
+      return throwError(() => new Error('Full subscription payment amount is required.'));
+    }
+
+    if (expectedFee !== undefined && req.amount !== expectedFee) {
+      return throwError(() => new Error(`Partial payments are not allowed. Full fee (${expectedFee} JOD) is required.`));
+    }
+
     return this.http.post('/api/payments/admin', req).pipe(
-      tap(() => {
+      tap((response) => {
+        const res = this.asRecord(response);
+        const resSubStatus = res ? this.pickString(res, ['subscriptionStatus', 'SubscriptionStatus']) : '';
+        const resPayStatus = res ? this.pickString(res, ['paymentStatus', 'PaymentStatus', 'status', 'Status']) : '';
+        const resRemaining = res ? this.pickNumber(res, ['remainingAmount', 'RemainingAmount', 'outstandingBalance']) : undefined;
+
+        const isFullConfirmed =
+          resSubStatus === 'Approved' ||
+          (!resSubStatus &&
+            resPayStatus !== 'Partial' &&
+            resPayStatus !== 'Unpaid' &&
+            (resRemaining === undefined || resRemaining <= 0));
+
+        if (!isFullConfirmed) {
+          return;
+        }
+
         this.updateSubscriptionStatus(req.subscriptionId, 'Approved');
-        const targetSub = this.rawSubscriptionsSignal().find((s) => s.subscriptionId === req.subscriptionId);
         this.rawPaymentsSignal.update((prev) =>
           prev.map((p) =>
             p.subscriptionId === req.subscriptionId ||
