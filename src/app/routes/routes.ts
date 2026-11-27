@@ -29,6 +29,8 @@ interface SchoolRoute {
   readonly assignedDriver: string | null;
   readonly capacity: number;
   readonly enrolledStudents: number;
+  readonly reservedSeats?: number | null;
+  readonly remainingSeats?: number | null;
   readonly isActive: boolean;
 }
 
@@ -249,11 +251,22 @@ export class Routes implements OnInit {
   });
 
   protected remainingSeats(route: SchoolRoute): number {
+    if (typeof route.remainingSeats === 'number' && !isNaN(route.remainingSeats)) {
+      return Math.max(0, route.remainingSeats);
+    }
+    if (typeof route.reservedSeats === 'number' && !isNaN(route.reservedSeats)) {
+      return Math.max(0, route.capacity - route.reservedSeats);
+    }
     return Math.max(0, route.capacity - route.enrolledStudents);
   }
 
   protected canRequestTransportation(route: SchoolRoute): boolean {
-    return route.isActive && this.remainingSeats(route) > 0;
+    return (
+      route.isActive &&
+      this.remainingSeats(route) > 0 &&
+      Boolean(route.assignedBus) &&
+      Boolean(route.assignedDriver)
+    );
   }
 
   protected updateSearch(event: Event): void {
@@ -392,6 +405,19 @@ export class Routes implements OnInit {
     const routeDropoff = this.pickStr(item, ['dropoffTime', 'DropoffTime', 'afternoonDropoffTime']);
     const { pickupTime, dropoffTime } = this.resolveTimes(stops, routePickup, routeDropoff);
 
+    const remainingSeats =
+      typeof item['remainingSeats'] === 'number'
+        ? (item['remainingSeats'] as number)
+        : typeof item['RemainingSeats'] === 'number'
+        ? (item['RemainingSeats'] as number)
+        : null;
+    const reservedSeats =
+      typeof item['reservedSeats'] === 'number'
+        ? (item['reservedSeats'] as number)
+        : typeof item['ReservedSeats'] === 'number'
+        ? (item['ReservedSeats'] as number)
+        : null;
+
     return {
       id,
       routeNumber,
@@ -406,6 +432,8 @@ export class Routes implements OnInit {
       assignedDriver,
       capacity,
       enrolledStudents,
+      reservedSeats,
+      remainingSeats,
       isActive,
     };
   }

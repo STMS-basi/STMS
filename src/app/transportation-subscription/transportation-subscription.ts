@@ -111,59 +111,67 @@ export class TransportationSubscription implements OnInit {
     return this.availableStops().find((s) => s.stopId === stId);
   });
 
-  public readonly remainingSeats = computed<number>(() => {
+  public readonly remainingSeats = computed<number | null>(() => {
     const r = this.selectedRoute();
-    return r ? this.routeRemainingSeats(r) : 0;
+    return r ? this.routeRemainingSeats(r) : null;
   });
 
   public readonly hasSeatData = computed<boolean>(() => {
-    const r = this.selectedRoute();
-    return Boolean(r && this.routeHasSeatData(r));
+    return this.remainingSeats() !== null;
   });
 
   public readonly isRouteFull = computed<boolean>(() => {
     const r = this.selectedRoute();
-    return Boolean(r && this.hasSeatData() && this.remainingSeats() <= 0);
+    const seats = this.remainingSeats();
+    return Boolean(r && seats !== null && seats <= 0);
   });
 
-  public routeRemainingSeats(route: RouteItem): number {
-    // Prefer the backend-computed remainingSeats when available
+  public routeRemainingSeats(route: RouteItem): number | null {
+    // 1. Prefer the backend-computed remainingSeats directly (even if 0)
     if (typeof route.remainingSeats === 'number' && !isNaN(route.remainingSeats)) {
       return Math.max(0, route.remainingSeats);
     }
 
-    // Fallback: compute from capacity − enrolledStudents (pre-API compat)
-    const capacity = typeof route.capacity === 'number' && !isNaN(route.capacity) ? route.capacity : 0;
-    const enrolled =
-      typeof route.enrolledStudents === 'number' && !isNaN(route.enrolledStudents)
-        ? route.enrolledStudents
-        : 0;
-    return Math.max(0, capacity - enrolled);
+    // 2. Computed from capacity - reservedSeats if present
+    if (
+      typeof route.capacity === 'number' &&
+      !isNaN(route.capacity) &&
+      typeof route.reservedSeats === 'number' &&
+      !isNaN(route.reservedSeats)
+    ) {
+      return Math.max(0, route.capacity - route.reservedSeats);
+    }
+
+    // 3. Fallback only if enrolledStudents is explicitly provided
+    if (
+      typeof route.capacity === 'number' &&
+      !isNaN(route.capacity) &&
+      typeof route.enrolledStudents === 'number' &&
+      !isNaN(route.enrolledStudents)
+    ) {
+      return Math.max(0, route.capacity - route.enrolledStudents);
+    }
+
+    // Never fallback to raw capacity when seat data is missing/null
+    return null;
   }
 
   /** Whether the route has valid seat information (remainingSeats is not null/undefined) */
   public routeHasSeatData(route: RouteItem): boolean {
-    if (typeof route.remainingSeats === 'number' && !isNaN(route.remainingSeats)) {
-      return true;
-    }
-    // Fallback: enrolledStudents exists
-    if (typeof route.enrolledStudents === 'number' && !isNaN(route.enrolledStudents)) {
-      return true;
-    }
-    return false;
+    return this.routeRemainingSeats(route) !== null;
   }
 
   private isRouteEligible(route: RouteItem): boolean {
     if (route.isActive === false) return false;
     if (route.isEligible === false || route.eligibleForSubscription === false) return false;
-    if (this.routeRemainingSeats(route) <= 0) return false;
 
-    const enforceAssignment =
-      this.routeService.hasBackendRoutes() || this.hasAssignmentMetadata(route);
-    if (enforceAssignment) {
-      if (!this.hasQualifiedBus(route) || !this.hasQualifiedDriver(route)) {
-        return false;
-      }
+    // Exclude full routes
+    const seats = this.routeRemainingSeats(route);
+    if (seats !== null && seats <= 0) return false;
+
+    // Routes must have an active bus and driver assigned to be eligible
+    if (!this.hasQualifiedBus(route) || !this.hasQualifiedDriver(route)) {
+      return false;
     }
 
     return true;
@@ -450,6 +458,11 @@ export class TransportationSubscription implements OnInit {
     if (type !== 'OneWay') {
       this.selectedDirection.set(null);
       this.directionTouched.set(false);
+    }
+    const stop = this.selectedStop();
+    if (stop && !this.isStopSelectable(stop)) {
+      this.selectedStopId.set(0);
+      this.subForm.patchValue({ stopId: 0 }, { emitEvent: false });
     }
   }
 

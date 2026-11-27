@@ -102,8 +102,9 @@
                   <option [value]="0" disabled>{{ t().selectRoutePlaceholder }}</option>
                   @for (r of eligibleRoutes(); track r.routeId) {
                   <option [value]="r.routeId">
-                    {{ r.routeNumber }}: {{ r.name }} ({{ r.serviceArea }}) &bull;
-                    {{ routeRemainingSeats(r) }}
+                    {{ r.routeNumber }}: {{ r.name }} ({{ r.serviceArea }})
+                    @if (routeRemainingSeats(r) !== null) {
+                    &bull; {{ routeRemainingSeats(r) }}
                     {{
                     prefs.lang() === 'ar'
                     ? 'مقعد متاح'
@@ -111,6 +112,7 @@
                     ? 'seat left'
                     : 'seats left'
                     }}
+                    }
                   </option>
                   }
                 </select>

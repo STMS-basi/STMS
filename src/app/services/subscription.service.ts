@@ -115,12 +115,9 @@ function toTripDirection(transportType: TransportType, direction?: OneWayDirecti
 /** Map backend tripDirection back to frontend OneWayDirection */
 function fromTripDirection(tripDir?: TripDirection | string | null): OneWayDirection | null {
   if (!tripDir) return null;
-  const normalized = String(tripDir).trim();
-  if (normalized === 'MorningPickup') return 'Morning';
-  if (normalized === 'AfternoonDropoff') return 'Afternoon';
-  // Legacy values passthrough
-  if (normalized === 'Morning') return 'Morning';
-  if (normalized === 'Afternoon') return 'Afternoon';
+  const normalized = String(tripDir).trim().toLowerCase();
+  if (normalized === 'morningpickup' || normalized === 'morning') return 'Morning';
+  if (normalized === 'afternoondropoff' || normalized === 'afternoon') return 'Afternoon';
   return null;
 }
 
@@ -225,6 +222,14 @@ export class SubscriptionService {
                 item.referenceNumber.trim().toUpperCase() === referenceNumber.trim().toUpperCase())
           );
 
+          const rawTripDir = String(raw.tripDirection ?? raw.direction ?? raw.oneWayDirection ?? '').trim().toLowerCase();
+          const isOneWay =
+            raw.transportType === 'OneWay' ||
+            rawTripDir === 'morningpickup' ||
+            rawTripDir === 'afternoondropoff' ||
+            rawTripDir === 'morning' ||
+            rawTripDir === 'afternoon';
+
           return {
             subscriptionId,
             referenceNumber,
@@ -242,15 +247,14 @@ export class SubscriptionService {
             dropoffTime: String(
               raw.dropoffTime ?? raw.dropOffTime ?? raw.stop?.dropoffTime ?? raw.stop?.dropOffTime ?? matchedStop?.dropoffTime ?? ''
             ),
-            direction:
-              raw.transportType === 'OneWay'
-                ? (fromTripDirection(raw.tripDirection) ??
-                   fromTripDirection(raw.direction) ??
-                   fromTripDirection(raw.oneWayDirection) ??
-                   localMatch?.direction ??
-                   null)
-                : null,
-            transportType: (raw.transportType === 'OneWay' ? 'OneWay' : 'RoundTrip') as TransportType,
+            direction: isOneWay
+              ? (fromTripDirection(raw.tripDirection) ??
+                 fromTripDirection(raw.direction) ??
+                 fromTripDirection(raw.oneWayDirection) ??
+                 localMatch?.direction ??
+                 null)
+              : null,
+            transportType: (isOneWay ? 'OneWay' : 'RoundTrip') as TransportType,
             fee: Number(raw.fee ?? (raw.transportType === 'OneWay' ? 150 : 300)),
             status: (raw.status ?? 'Pending') as SubscriptionStatus,
             startDate: String(raw.startDate ?? '2026-09-01'),
