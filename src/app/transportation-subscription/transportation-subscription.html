@@ -165,11 +165,7 @@
                 </select>
                 @if (selectedStopMissingSchedule()) {
                 <p class="field-error">
-                  {{
-                  prefs.lang() === 'ar'
-                  ? 'مواعيد الصعود والنزول لهذه المحطة غير محددة حالياً، يرجى اختيار محطة أخرى.'
-                  : 'Pickup and drop-off times are not set for this stop yet. Please select another stop.'
-                  }}
+                  {{ stopScheduleErrorMessage() }}
                 </p>
                 } @else if (availableStops().length > 0 && schedulableStops().length === 0) {
                 <div class="capacity-box capacity-alert">
@@ -320,11 +316,7 @@
 
               @if (selectedStopMissingSchedule()) {
               <p class="field-error">
-                {{
-                prefs.lang() === 'ar'
-                ? 'تنبيه: مواعيد هذه المحطة غير محددة حالياً.'
-                : 'Warning: Schedule times are not set for this stop.'
-                }}
+                {{ stopScheduleErrorMessage() }}
               </p>
               }
 

@@ -380,30 +380,40 @@ export class TransportationSubscription implements OnInit {
     return Boolean(stop && (this.hasStopTime(stop.pickupTime) || this.hasStopTime(stop.dropoffTime)));
   }
 
-  /** Whether a stop is valid for the currently selected direction */
-  public stopMatchesDirection(stop?: RouteStop | null): boolean {
+  /**
+   * Whether a stop satisfies the schedule requirements of the current transport type and direction:
+   * - RoundTrip: MUST have BOTH pickupTime and dropoffTime.
+   * - OneWay + Morning: MUST have pickupTime.
+   * - OneWay + Afternoon: MUST have dropoffTime.
+   * - OneWay (direction not chosen yet): must have at least one time.
+   */
+  public isStopSelectable(stop?: RouteStop | null): boolean {
     if (!stop) return false;
     const type = this.selectedTransportType();
     const dir = this.selectedDirection();
 
-    if (type === 'OneWay' && dir === 'Morning') {
-      return this.hasStopTime(stop.pickupTime);
+    const hasPickup = this.hasStopTime(stop.pickupTime);
+    const hasDropoff = this.hasStopTime(stop.dropoffTime);
+
+    if (type === 'RoundTrip') {
+      return hasPickup && hasDropoff;
     }
-    if (type === 'OneWay' && dir === 'Afternoon') {
-      return this.hasStopTime(stop.dropoffTime);
+
+    if (type === 'OneWay') {
+      if (dir === 'Morning') {
+        return hasPickup;
+      }
+      if (dir === 'Afternoon') {
+        return hasDropoff;
+      }
+      return hasPickup || hasDropoff;
     }
-    // RoundTrip or no direction selected yet: require both
-    return this.hasStopTime(stop.pickupTime) && this.hasStopTime(stop.dropoffTime);
+
+    return false;
   }
 
-  /** Whether a stop can be selected: has the schedule required for the chosen direction */
-  public isStopSelectable(stop?: RouteStop | null): boolean {
-    if (!stop) return false;
-    // If transport type hasn't been narrowed to OneWay yet, any schedule is okay
-    if (this.selectedTransportType() !== 'OneWay' || this.selectedDirection() === null) {
-      return this.stopHasSchedule(stop);
-    }
-    return this.stopMatchesDirection(stop);
+  public stopMatchesDirection(stop?: RouteStop | null): boolean {
+    return this.isStopSelectable(stop);
   }
 
   public readonly schedulableStops = computed<readonly RouteStop[]>(() =>
@@ -417,6 +427,49 @@ export class TransportationSubscription implements OnInit {
   public readonly selectedStopMissingSchedule = computed<boolean>(() => {
     const stop = this.selectedStop();
     return Boolean(stop && !this.isStopSelectable(stop));
+  });
+
+  public readonly stopScheduleErrorMessage = computed<string>(() => {
+    const stop = this.selectedStop();
+    if (!stop || this.isStopSelectable(stop)) return '';
+
+    const isAr = this.prefs.lang() === 'ar';
+    const type = this.selectedTransportType();
+    const dir = this.selectedDirection();
+    const hasPickup = this.hasStopTime(stop.pickupTime);
+    const hasDropoff = this.hasStopTime(stop.dropoffTime);
+
+    if (type === 'RoundTrip') {
+      if (hasPickup && !hasDropoff) {
+        return isAr
+          ? 'المحطة المختارة تحتوي على موعد اصطحاب صباحي فقط وتفتقر لموعد العودة، ولا يمكن الاشتراك بها لاشتراك الذهاب والإياب.'
+          : 'The selected stop only has a morning pickup time and is missing a return time. It cannot be used for a Round Trip subscription.';
+      }
+      if (!hasPickup && hasDropoff) {
+        return isAr
+          ? 'المحطة المختارة تحتوي على موعد عودة بعد الظهر فقط وتفتقر لموعد الاصطحاب، ولا يمكن الاشتراك بها لاشتراك الذهاب والإياب.'
+          : 'The selected stop only has an afternoon drop-off time and is missing a pickup time. It cannot be used for a Round Trip subscription.';
+      }
+      return isAr
+        ? 'المحطة المختارة غير محددة المواعيد ولا يمكن الاشتراك بها لاشتراك الذهاب والإياب.'
+        : 'The selected stop has no scheduled times and cannot be used for a Round Trip subscription.';
+    }
+
+    if (type === 'OneWay' && dir === 'Morning' && !hasPickup) {
+      return isAr
+        ? 'المحطة المختارة لا تحتوي على موعد اصطحاب صباحي، يرجى اختيار محطة أخرى أو تغيير نوع الاشتراك.'
+        : 'The selected stop does not have a morning pickup time. Please choose another stop or subscription type.';
+    }
+
+    if (type === 'OneWay' && dir === 'Afternoon' && !hasDropoff) {
+      return isAr
+        ? 'المحطة المختارة لا تحتوي على موعد عودة بعد الظهر، يرجى اختيار محطة أخرى أو تغيير نوع الاشتراك.'
+        : 'The selected stop does not have an afternoon drop-off time. Please choose another stop or subscription type.';
+    }
+
+    return isAr
+      ? 'المواعيد المطلوبة لهذه المحطة غير مكتملة لنوع الاشتراك المحدد.'
+      : 'The required schedule for this stop is not complete for the selected subscription type.';
   });
 
   public formatStopOptionLabel(stop: RouteStop): string {
@@ -437,7 +490,22 @@ export class TransportationSubscription implements OnInit {
     if (hasDropoff) {
       parts.push(`${this.t().dropoffTimeLabel}: ${stop.dropoffTime.trim()}`);
     }
-    return `${stop.name} • ${parts.join(' | ')}`;
+    const label = `${stop.name} • ${parts.join(' | ')}`;
+
+    if (!this.isStopSelectable(stop)) {
+      const type = this.selectedTransportType();
+      if (type === 'RoundTrip') {
+        if (hasPickup && !hasDropoff) {
+          return `${label} (${isAr ? 'غير متاحة لذهاب وإياب - بدون عودة' : 'Unavailable for Round Trip - missing dropoff'})`;
+        }
+        if (!hasPickup && hasDropoff) {
+          return `${label} (${isAr ? 'غير متاحة لذهاب وإياب - بدون اصطحاب' : 'Unavailable for Round Trip - missing pickup'})`;
+        }
+      }
+      return `${label} (${isAr ? 'غير متاحة للاشتراك الحالي' : 'Unavailable for current selection'})`;
+    }
+
+    return label;
   }
 
   protected readonly selectedDirectionLabel = computed<string>(() => {
