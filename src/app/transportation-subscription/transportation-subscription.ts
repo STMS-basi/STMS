@@ -321,7 +321,15 @@ export class TransportationSubscription implements OnInit {
     });
 
     this.subForm.get('stopId')?.valueChanges.subscribe((id) => {
-      this.selectedStopId.set(Number(id));
+      const numId = Number(id);
+      this.selectedStopId.set(numId);
+      if (numId > 0) {
+        const stop = this.availableStops().find((s) => s.stopId === numId);
+        if (stop && !this.isStopSelectable(stop)) {
+          this.selectedStopId.set(0);
+          this.subForm.patchValue({ stopId: 0 }, { emitEvent: false });
+        }
+      }
     });
 
     this.subForm.get('transportType')?.valueChanges.subscribe((type) => {
@@ -330,6 +338,11 @@ export class TransportationSubscription implements OnInit {
       if (nextType !== 'OneWay') {
         this.selectedDirection.set(null);
         this.directionTouched.set(false);
+      }
+      const stop = this.selectedStop();
+      if (stop && !this.isStopSelectable(stop)) {
+        this.selectedStopId.set(0);
+        this.subForm.patchValue({ stopId: 0 }, { emitEvent: false });
       }
     });
 
@@ -427,6 +440,18 @@ export class TransportationSubscription implements OnInit {
   public readonly selectedStopMissingSchedule = computed<boolean>(() => {
     const stop = this.selectedStop();
     return Boolean(stop && !this.isStopSelectable(stop));
+  });
+
+  public readonly isSubmitDisabled = computed<boolean>(() => {
+    if (this.isSubmitting()) return true;
+    if (this.isRouteFull()) return true;
+    if (this.selectedRouteId() <= 0) return true;
+    if (this.selectedStopId() <= 0) return true;
+    if (this.subForm.invalid) return true;
+    const stop = this.selectedStop();
+    if (!stop || !this.isStopSelectable(stop)) return true;
+    if (this.selectedTransportType() === 'OneWay' && !this.selectedDirection()) return true;
+    return false;
   });
 
   public readonly stopScheduleErrorMessage = computed<string>(() => {
