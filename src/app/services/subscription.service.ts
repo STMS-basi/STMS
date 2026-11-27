@@ -6,6 +6,7 @@ import { RouteService } from './route.service';
 
 export type TransportType = 'OneWay' | 'RoundTrip';
 export type OneWayDirection = 'Morning' | 'Afternoon';
+export type TripDirection = 'MorningPickup' | 'AfternoonDropoff' | 'Both';
 export type SubscriptionStatus = 'Pending' | 'AwaitingPayment' | 'Approved' | 'Rejected';
 
 export interface SubscriptionItem {
@@ -62,6 +63,9 @@ export interface BackendSubscriptionResponse {
   readonly status?: SubscriptionStatus;
   readonly startDate?: string;
   readonly endDate?: string;
+  readonly tripDirection?: TripDirection | string | null;
+  readonly transportType?: TransportType | string | null;
+  readonly direction?: string | null;
 }
 
 export interface RegistrationInfo {
@@ -98,6 +102,27 @@ interface RegistrationInfoRaw {
 }
 
 const STORAGE_SUBSCRIPTIONS_KEY = 'stms_subscriptions';
+
+/** Map frontend OneWayDirection to backend tripDirection */
+function toTripDirection(transportType: TransportType, direction?: OneWayDirection | null): TripDirection {
+  if (transportType === 'OneWay') {
+    if (direction === 'Morning') return 'MorningPickup';
+    if (direction === 'Afternoon') return 'AfternoonDropoff';
+  }
+  return 'Both';
+}
+
+/** Map backend tripDirection back to frontend OneWayDirection */
+function fromTripDirection(tripDir?: TripDirection | string | null): OneWayDirection | null {
+  if (!tripDir) return null;
+  const normalized = String(tripDir).trim();
+  if (normalized === 'MorningPickup') return 'Morning';
+  if (normalized === 'AfternoonDropoff') return 'Afternoon';
+  // Legacy values passthrough
+  if (normalized === 'Morning') return 'Morning';
+  if (normalized === 'Afternoon') return 'Afternoon';
+  return null;
+}
 
 @Injectable({
   providedIn: 'root',
@@ -219,9 +244,11 @@ export class SubscriptionService {
             ),
             direction:
               raw.transportType === 'OneWay'
-                ? (String(raw.direction ?? raw.oneWayDirection ?? raw.tripDirection ?? '').trim() ||
-                  localMatch?.direction ||
-                  null)
+                ? (fromTripDirection(raw.tripDirection) ??
+                   fromTripDirection(raw.direction) ??
+                   fromTripDirection(raw.oneWayDirection) ??
+                   localMatch?.direction ??
+                   null)
                 : null,
             transportType: (raw.transportType === 'OneWay' ? 'OneWay' : 'RoundTrip') as TransportType,
             fee: Number(raw.fee ?? (raw.transportType === 'OneWay' ? 150 : 300)),
@@ -375,75 +402,54 @@ export class SubscriptionService {
 
   public createSubscription(
     payload: CreateSubscriptionPayload
-  ): SubscriptionItem {
-    const id = Date.now();
-    const referenceNumber = this.generateReferenceNumber();
+  ): Observable<SubscriptionItem> {
     const requestedAt = new Date().toISOString();
+    const tripDirection = toTripDirection(payload.transportType, payload.direction);
 
-    const newSub: SubscriptionItem = {
-      subscriptionId: id,
-      referenceNumber,
-      studentId: payload.studentId,
-      studentName: payload.studentName,
-      studentGrade: payload.studentGrade,
-      routeId: payload.routeId,
-      routeNumber: payload.routeNumber,
-      routeName: payload.routeName,
-      stopId: payload.stopId,
-      stopName: payload.stopName,
-      pickupTime: payload.pickupTime,
-      dropoffTime: payload.dropoffTime,
-      transportType: payload.transportType,
-      direction: payload.transportType === 'OneWay' ? (payload.direction ?? null) : null,
-      fee: payload.fee,
-      status: 'Pending',
-      startDate: payload.startDate ?? '2027-01-15',
-      endDate: payload.endDate ?? '2027-05-31',
-      requestedAt,
-      parentEmail: this.authService.userEmail()?.toLowerCase() ?? '',
-    };
-
-    const updated = [newSub, ...this.subscriptionsSignal()];
-    this.subscriptionsSignal.set(updated);
-    this.persist(updated);
-
-    // Dispatch real HTTP POST to /api/subscriptions
     const requestBody: Record<string, unknown> = {
       studentId: payload.studentId,
       routeId: payload.routeId,
       stopId: payload.stopId,
       transportType: payload.transportType,
-      ...(payload.transportType === 'OneWay' && payload.direction
-        ? { direction: payload.direction, oneWayDirection: payload.direction }
-        : {}),
+      tripDirection,
     };
 
-    this.http
+    return this.http
       .post<BackendSubscriptionResponse>('/api/subscriptions', requestBody)
       .pipe(
-        tap((res) => {
-          if (res && res.referenceNumber) {
-            const synced = this.subscriptionsSignal().map((s) =>
-              s.subscriptionId === id
-                ? {
-                    ...s,
-                    subscriptionId: res.subscriptionId ?? s.subscriptionId,
-                    referenceNumber: res.referenceNumber,
-                    fee: res.fee ?? s.fee,
-                    startDate: res.startDate ?? s.startDate,
-                    endDate: res.endDate ?? s.endDate,
-                  }
-                : s
-            );
-            this.subscriptionsSignal.set(synced);
-            this.persist(synced);
-          }
-        }),
-        catchError(() => of(null))
-      )
-      .subscribe();
+        map((res) => {
+          const newSub: SubscriptionItem = {
+            subscriptionId: res.subscriptionId ?? Date.now(),
+            referenceNumber: res.referenceNumber ?? this.generateReferenceNumber(),
+            studentId: payload.studentId,
+            studentName: payload.studentName,
+            studentGrade: payload.studentGrade,
+            routeId: payload.routeId,
+            routeNumber: payload.routeNumber,
+            routeName: payload.routeName,
+            stopId: payload.stopId,
+            stopName: payload.stopName,
+            pickupTime: payload.pickupTime,
+            dropoffTime: payload.dropoffTime,
+            transportType: payload.transportType,
+            direction:
+              payload.transportType === 'OneWay'
+                ? (fromTripDirection(res.tripDirection) ?? payload.direction ?? null)
+                : null,
+            fee: res.fee ?? payload.fee,
+            status: (res.status ?? 'Pending') as SubscriptionStatus,
+            startDate: res.startDate ?? payload.startDate ?? '2027-01-15',
+            endDate: res.endDate ?? payload.endDate ?? '2027-05-31',
+            requestedAt,
+            parentEmail: this.authService.userEmail()?.toLowerCase() ?? '',
+          };
 
-    return newSub;
+          const updated = [newSub, ...this.subscriptionsSignal()];
+          this.subscriptionsSignal.set(updated);
+          this.persist(updated);
+          return newSub;
+        })
+      );
   }
 
   public getByReference(

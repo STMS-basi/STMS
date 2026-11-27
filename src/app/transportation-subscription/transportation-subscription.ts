@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Header } from '../header/header';
 import { AuthService } from '../services/auth.service';
 import { PreferencesService } from '../services/preferences.service';
@@ -371,17 +372,43 @@ export class TransportationSubscription implements OnInit {
     return Boolean(stop && (this.hasStopTime(stop.pickupTime) || this.hasStopTime(stop.dropoffTime)));
   }
 
+  /** Whether a stop is valid for the currently selected direction */
+  public stopMatchesDirection(stop?: RouteStop | null): boolean {
+    if (!stop) return false;
+    const type = this.selectedTransportType();
+    const dir = this.selectedDirection();
+
+    if (type === 'OneWay' && dir === 'Morning') {
+      return this.hasStopTime(stop.pickupTime);
+    }
+    if (type === 'OneWay' && dir === 'Afternoon') {
+      return this.hasStopTime(stop.dropoffTime);
+    }
+    // RoundTrip or no direction selected yet: require both
+    return this.hasStopTime(stop.pickupTime) && this.hasStopTime(stop.dropoffTime);
+  }
+
+  /** Whether a stop can be selected: has the schedule required for the chosen direction */
+  public isStopSelectable(stop?: RouteStop | null): boolean {
+    if (!stop) return false;
+    // If transport type hasn't been narrowed to OneWay yet, any schedule is okay
+    if (this.selectedTransportType() !== 'OneWay' || this.selectedDirection() === null) {
+      return this.stopHasSchedule(stop);
+    }
+    return this.stopMatchesDirection(stop);
+  }
+
   public readonly schedulableStops = computed<readonly RouteStop[]>(() =>
-    this.availableStops().filter((stop) => this.stopHasSchedule(stop))
+    this.availableStops().filter((stop) => this.isStopSelectable(stop))
   );
 
   public readonly hasUnscheduledStops = computed<boolean>(() =>
-    this.availableStops().some((stop) => !this.stopHasSchedule(stop))
+    this.availableStops().some((stop) => !this.isStopSelectable(stop))
   );
 
   public readonly selectedStopMissingSchedule = computed<boolean>(() => {
     const stop = this.selectedStop();
-    return Boolean(stop && !this.stopHasSchedule(stop));
+    return Boolean(stop && !this.isStopSelectable(stop));
   });
 
   public formatStopOptionLabel(stop: RouteStop): string {
@@ -430,6 +457,13 @@ export class TransportationSubscription implements OnInit {
     this.selectedDirection.set(direction);
     this.directionTouched.set(true);
     this.errorMessage.set(null);
+
+    // Re-validate the currently selected stop against the new direction
+    const stop = this.selectedStop();
+    if (stop && !this.isStopSelectable(stop)) {
+      this.selectedStopId.set(0);
+      this.subForm.patchValue({ stopId: 0 }, { emitEvent: false });
+    }
   }
 
   protected onSubmit(): void {
@@ -469,11 +503,11 @@ export class TransportationSubscription implements OnInit {
       return;
     }
 
-    if (!this.stopHasSchedule(stop)) {
+    if (!this.isStopSelectable(stop)) {
       this.errorMessage.set(
         this.prefs.lang() === 'ar'
-          ? 'المحطة المختارة لا تحتوي على مواعيد صعود أو نزول محددة حالياً ولا يمكن الاشتراك بها.'
-          : 'The selected stop does not have scheduled pickup or drop-off times yet and cannot be selected.'
+          ? 'المحطة المختارة لا تحتوي على المواعيد المطلوبة لنوع الاشتراك المحدد.'
+          : 'The selected stop does not have the required schedule for the chosen subscription type.'
       );
       return;
     }
@@ -489,23 +523,51 @@ export class TransportationSubscription implements OnInit {
 
     this.isSubmitting.set(true);
 
-    const created = this.subscriptionService.createSubscription({
-      studentId: student.studentId,
-      studentName: student.fullName,
-      studentGrade: student.grade,
-      routeId: routeItem.routeId,
-      routeNumber: routeItem.routeNumber,
-      routeName: routeItem.name,
-      stopId: stop.stopId,
-      stopName: stop.name,
-      pickupTime: stop.pickupTime,
-      dropoffTime: stop.dropoffTime,
-      transportType: formVals.transportType,
-      direction: formVals.transportType === 'OneWay' ? this.selectedDirection() : null,
-      fee: this.calculatedFee(),
-    });
-
-    this.isSubmitting.set(false);
-    void this.router.navigate(['/subscription-confirmation', created.referenceNumber]);
+    this.subscriptionService
+      .createSubscription({
+        studentId: student.studentId,
+        studentName: student.fullName,
+        studentGrade: student.grade,
+        routeId: routeItem.routeId,
+        routeNumber: routeItem.routeNumber,
+        routeName: routeItem.name,
+        stopId: stop.stopId,
+        stopName: stop.name,
+        pickupTime: stop.pickupTime,
+        dropoffTime: stop.dropoffTime,
+        transportType: formVals.transportType,
+        direction: formVals.transportType === 'OneWay' ? this.selectedDirection() : null,
+        fee: this.calculatedFee(),
+      })
+      .subscribe({
+        next: (created) => {
+          this.isSubmitting.set(false);
+          void this.router.navigate(['/subscription-confirmation', created.referenceNumber]);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.isSubmitting.set(false);
+          if (err.status === 0) {
+            this.errorMessage.set(
+              this.prefs.lang() === 'ar'
+                ? 'تعذر الاتصال بالخادم. يرجى التحقق من الاتصال والمحاولة مرة أخرى.'
+                : 'Could not connect to the server. Please check your connection and try again.'
+            );
+          } else if (err.status === 409) {
+            this.errorMessage.set(
+              this.prefs.lang() === 'ar'
+                ? 'هذا الطالب مشترك مسبقاً في هذا المسار.'
+                : 'This student is already subscribed to this route.'
+            );
+          } else if (err.error && typeof err.error === 'object' && 'message' in err.error) {
+            this.errorMessage.set(String(err.error.message));
+          } else {
+            this.errorMessage.set(
+              this.prefs.lang() === 'ar'
+                ? 'حدث خطأ أثناء إرسال طلب الاشتراك. يرجى المحاولة مرة أخرى.'
+                : 'An error occurred while submitting the subscription. Please try again.'
+            );
+          }
+        },
+      });
   }
 }
