@@ -12,380 +12,350 @@
         </div>
 
         @if (registrationInfo(); as info) {
-          <div
-            class="registration-banner"
-            [class.banner-open]="info.registrationOpen || info.isRegistrationOpen"
-            [class.banner-closed]="!(info.registrationOpen || info.isRegistrationOpen)"
-            role="status"
-          >
-            <span class="banner-icon">{{ (info.registrationOpen || info.isRegistrationOpen) ? '🟢' : '🔴' }}</span>
-            <div class="banner-text">
-              <strong>
-                <bdi>{{ formatSemesterName(info.semesterName) }}</bdi> &bull;
-                {{ (info.registrationOpen || info.isRegistrationOpen)
-                  ? (prefs.lang() === 'ar' ? 'التسجيل متاح حالياً' : 'Registration is currently open')
-                  : (prefs.lang() === 'ar' ? 'التسجيل مغلق حالياً' : 'Registration is currently closed') }}
-              </strong>
-              @if (formatBannerDate(info.rawRegistrationOpenDate, info.registrationOpenDate) || formatBannerDate(info.rawStartDate, info.startDate)) {
-                <span class="banner-notes">
-                  @if (formatBannerDate(info.rawRegistrationOpenDate, info.registrationOpenDate); as openDate) {
-                    <span class="banner-date-item">
-                      <span>{{ prefs.lang() === 'ar' ? 'تاريخ الفتح:' : 'Opens:' }}</span>
-                      <bdi>{{ openDate }}</bdi>
-                    </span>
-                  }
-                  @if (formatBannerDate(info.rawRegistrationOpenDate, info.registrationOpenDate) && formatBannerDate(info.rawStartDate, info.startDate)) {
-                    <span aria-hidden="true">&bull;</span>
-                  }
-                  @if (formatBannerDate(info.rawStartDate, info.startDate); as startDate) {
-                    <span class="banner-date-item">
-                      <span>{{ prefs.lang() === 'ar' ? 'بداية الفصل:' : 'Starts:' }}</span>
-                      <bdi>{{ startDate }}</bdi>
-                    </span>
-                  }
-                </span>
+        <div class="registration-banner" [class.banner-open]="info.registrationOpen || info.isRegistrationOpen"
+          [class.banner-closed]="!(info.registrationOpen || info.isRegistrationOpen)" role="status">
+          <span class="banner-icon">{{ (info.registrationOpen || info.isRegistrationOpen) ? '🟢' : '🔴' }}</span>
+          <div class="banner-text">
+            <strong>
+              <bdi>{{ formatSemesterName(info.semesterName) }}</bdi> &bull;
+              {{ (info.registrationOpen || info.isRegistrationOpen)
+              ? (prefs.lang() === 'ar' ? 'التسجيل متاح حالياً' : 'Registration is currently open')
+              : (prefs.lang() === 'ar' ? 'التسجيل مغلق حالياً' : 'Registration is currently closed') }}
+            </strong>
+            @if (formatBannerDate(info.rawRegistrationOpenDate, info.registrationOpenDate) ||
+            formatBannerDate(info.rawStartDate, info.startDate)) {
+            <span class="banner-notes">
+              @if (formatBannerDate(info.rawRegistrationOpenDate, info.registrationOpenDate); as openDate) {
+              <span class="banner-date-item">
+                <span>{{ prefs.lang() === 'ar' ? 'تاريخ الفتح:' : 'Opens:' }}</span>
+                <bdi>{{ openDate }}</bdi>
+              </span>
               }
-            </div>
+              @if (formatBannerDate(info.rawRegistrationOpenDate, info.registrationOpenDate) &&
+              formatBannerDate(info.rawStartDate, info.startDate)) {
+              <span aria-hidden="true">&bull;</span>
+              }
+              @if (formatBannerDate(info.rawStartDate, info.startDate); as startDate) {
+              <span class="banner-date-item">
+                <span>{{ prefs.lang() === 'ar' ? 'بداية الفصل:' : 'Starts:' }}</span>
+                <bdi>{{ startDate }}</bdi>
+              </span>
+              }
+            </span>
+            }
           </div>
+        </div>
         }
 
         @if (errorMessage()) {
-          <div class="alert alert-error" role="alert">
-            {{ errorMessage() }}
-          </div>
+        <div class="alert alert-error" role="alert">
+          {{ errorMessage() }}
+        </div>
         }
 
         <!-- No Students Warning -->
         @if (isLoadingStudents()) {
-          <div class="card warning-card">
-            <h2 class="warning-title">
-              {{ prefs.lang() === 'ar' ? 'جاري تحميل بيانات الطلاب...' : 'Loading registered students...' }}
-            </h2>
-          </div>
+        <div class="card warning-card">
+          <h2 class="warning-title">
+            {{ prefs.lang() === 'ar' ? 'جاري تحميل بيانات الطلاب...' : 'Loading registered students...' }}
+          </h2>
+        </div>
         } @else if (students().length === 0) {
-          <div class="card warning-card">
-            <h2 class="warning-title">{{ t().noRegisteredStudentsWarning }}</h2>
-            <div class="warning-action">
-              <a routerLink="/students" class="btn btn-primary btn-lg">
-                {{ t().registerStudentFirstBtn }}
-              </a>
-            </div>
+        <div class="card warning-card">
+          <h2 class="warning-title">{{ t().noRegisteredStudentsWarning }}</h2>
+          <div class="warning-action">
+            <a routerLink="/students" class="btn btn-primary btn-lg">
+              {{ t().registerStudentFirstBtn }}
+            </a>
           </div>
+        </div>
         } @else {
-          <div class="subscription-grid">
-            <!-- Form Section -->
-            <form [formGroup]="subForm" (ngSubmit)="onSubmit()" novalidate class="card sub-form-card">
-              <!-- Step 1: Select Student -->
-              <fieldset class="form-step">
-                <legend class="step-legend">{{ t().selectStudentStep }}</legend>
-                <div class="form-group step-group">
-                  <select
-                    id="studentId"
-                    formControlName="studentId"
-                    class="form-input"
-                    [class.input-error]="isFieldInvalid('studentId')"
-                    aria-label="Student Selection"
-                  >
-                    <option [value]="0" disabled>{{ t().selectStudentPlaceholder }}</option>
-                    @for (student of students(); track student.studentId) {
-                      <option [value]="student.studentId">
-                        {{ student.fullName }} ({{ student.grade }} &bull; {{ student.className }})
-                      </option>
-                    }
-                  </select>
-                  @if (isFieldInvalid('studentId')) {
-                    <p class="field-error">{{ t().selectStudentPlaceholder }}</p>
+        <div class="subscription-grid">
+          <!-- Form Section -->
+          <form [formGroup]="subForm" (ngSubmit)="onSubmit()" novalidate class="card sub-form-card">
+            <!-- Step 1: Select Student -->
+            <fieldset class="form-step">
+              <legend class="step-legend">{{ t().selectStudentStep }}</legend>
+              <div class="form-group step-group">
+                <select id="studentId" formControlName="studentId" class="form-input"
+                  [class.input-error]="isFieldInvalid('studentId')" aria-label="Student Selection">
+                  <option [value]="0" disabled>{{ t().selectStudentPlaceholder }}</option>
+                  @for (student of students(); track student.studentId) {
+                  <option [value]="student.studentId">
+                    {{ student.fullName }} ({{ student.grade }} &bull; {{ student.className }})
+                  </option>
                   }
-                </div>
-              </fieldset>
-
-              <!-- Step 2: Select Route -->
-              <fieldset class="form-step">
-                <legend class="step-legend">{{ t().selectRouteStep }}</legend>
-                <div class="form-group step-group">
-                  <select
-                    id="routeId"
-                    formControlName="routeId"
-                    class="form-input"
-                    [class.input-error]="isFieldInvalid('routeId')"
-                    [attr.disabled]="eligibleRoutes().length === 0 ? true : null"
-                    aria-label="Bus Route Selection"
-                  >
-                    <option [value]="0" disabled>{{ t().selectRoutePlaceholder }}</option>
-                    @for (r of eligibleRoutes(); track r.routeId) {
-                      <option [value]="r.routeId">
-                        {{ r.routeNumber }}: {{ r.name }} ({{ r.serviceArea }}) &bull;
-                        {{ routeRemainingSeats(r) }}
-                        {{
-                          prefs.lang() === 'ar'
-                            ? 'مقعد متاح'
-                            : routeRemainingSeats(r) === 1
-                              ? 'seat left'
-                              : 'seats left'
-                        }}
-                      </option>
-                    }
-                  </select>
-                  @if (routes().length > 0 && eligibleRoutes().length === 0) {
-                    <p class="capacity-warning-text">
-                      {{
-                        prefs.lang() === 'ar'
-                          ? 'لا توجد مسارات مؤهلة للاشتراك حالياً (يجب أن يكون المسار نشطاً وبمقاعد متاحة ومعيّناً له حافلة وسائق نشطان).'
-                          : 'No eligible routes are currently available (routes must be active with available seats and an assigned active bus and driver).'
-                      }}
-                    </p>
-                  }
-                  @if (isFieldInvalid('routeId')) {
-                    <p class="field-error">{{ t().selectRoutePlaceholder }}</p>
-                  }
-                </div>
-
-                <!-- Route Capacity Pill & Warning -->
-                @if (selectedRoute()) {
-                  <div class="capacity-box" [class.capacity-alert]="isRouteFull()">
-                    <span class="capacity-title">{{ t().routeCapacityLabel }}:</span>
-                    <strong class="capacity-count">{{ remainingSeats() }} / {{ selectedRoute()?.capacity }}</strong>
-                    @if (isRouteFull()) {
-                      <p class="capacity-warning-text">{{ t().routeFullWarning }}</p>
-                    }
-                  </div>
+                </select>
+                @if (isFieldInvalid('studentId')) {
+                <p class="field-error">{{ t().selectStudentPlaceholder }}</p>
                 }
-              </fieldset>
-
-              <!-- Step 3: Select Pickup Stop -->
-              <fieldset class="form-step">
-                <legend class="step-legend">{{ t().selectStopStep }}</legend>
-                <div class="form-group step-group">
-                  <select
-                    id="stopId"
-                    formControlName="stopId"
-                    class="form-input"
-                    [class.input-error]="isFieldInvalid('stopId')"
-                    [attr.disabled]="availableStops().length === 0 ? true : null"
-                    aria-label="Pickup Stop Selection"
-                  >
-                    <option [value]="0" disabled>{{ t().selectStopPlaceholder }}</option>
-                    @for (stop of availableStops(); track stop.stopId) {
-                      <option [value]="stop.stopId" [disabled]="!stopHasSchedule(stop)">
-                        {{ formatStopOptionLabel(stop) }}
-                      </option>
-                    }
-                  </select>
-                  @if (selectedStopMissingSchedule()) {
-                    <p class="field-error">
-                      {{
-                        prefs.lang() === 'ar'
-                          ? 'مواعيد الصعود والنزول لهذه المحطة غير محددة حالياً، يرجى اختيار محطة أخرى.'
-                          : 'Pickup and drop-off times are not set for this stop yet. Please select another stop.'
-                      }}
-                    </p>
-                  } @else if (availableStops().length > 0 && schedulableStops().length === 0) {
-                    <div class="capacity-box capacity-alert">
-                      <p class="capacity-warning-text">
-                        {{
-                          prefs.lang() === 'ar'
-                            ? 'لا توجد محطات بمواعيد صعود أو نزول محددة على هذا المسار حالياً، ولا يمكن إتمام الاشتراك لحين تحديد المواعيد.'
-                            : 'No stops on this route have scheduled pickup or drop-off times yet. Please wait until times are configured or select another route.'
-                        }}
-                      </p>
-                    </div>
-                  } @else if (hasUnscheduledStops()) {
-                    <p class="stop-schedule-note">
-                      {{
-                        prefs.lang() === 'ar'
-                          ? 'ملاحظة: المحطات التي لم تُحدد مواعيدها بعد غير متاحة للاختيار لحين تسجيل مواعيد الصعود والنزول الخاصة بها.'
-                          : 'Note: Stops without scheduled pickup or drop-off times are disabled and unavailable until their times are set.'
-                      }}
-                    </p>
-                  }
-                  @if (isFieldInvalid('stopId')) {
-                    <p class="field-error">{{ t().selectStopPlaceholder }}</p>
-                  }
-                </div>
-              </fieldset>
-
-              <!-- Step 4: Service Type Selection -->
-              <fieldset class="form-step">
-                <legend class="step-legend">{{ t().selectTypeStep }}</legend>
-                <div class="type-selector-grid">
-                  <button
-                    type="button"
-                    class="type-card"
-                    [class.type-card-selected]="subForm.get('transportType')?.value === 'RoundTrip'"
-                    (click)="selectTransportType('RoundTrip')"
-                  >
-                    <span class="type-title">{{ t().typeRoundTrip }}</span>
-                    <span class="type-desc">{{ t().typeRoundTripDesc }}</span>
-                    <strong class="type-price">300 JOD</strong>
-                  </button>
-
-                  <button
-                    type="button"
-                    class="type-card"
-                    [class.type-card-selected]="subForm.get('transportType')?.value === 'OneWay'"
-                    (click)="selectTransportType('OneWay')"
-                  >
-                    <span class="type-title">{{ t().typeOneWay }}</span>
-                    <span class="type-desc">{{ t().typeOneWayDesc }}</span>
-                    <strong class="type-price">150 JOD</strong>
-                  </button>
-                </div>
-
-                @if (selectedTransportType() === 'OneWay') {
-                  <div
-                    class="direction-selector"
-                    role="radiogroup"
-                    [attr.aria-label]="prefs.lang() === 'ar' ? 'تحديد اتجاه الاشتراك' : 'One-Way Direction Selection'"
-                  >
-                    <p class="direction-label">
-                      {{
-                        prefs.lang() === 'ar'
-                          ? 'حدد الاتجاه المطلوب لاشتراك الاتجاه الواحد:'
-                          : 'Choose One-Way Direction:'
-                      }}
-                    </p>
-                    <div class="type-selector-grid">
-                      <button
-                        type="button"
-                        role="radio"
-                        [attr.aria-checked]="selectedDirection() === 'Morning'"
-                        class="type-card direction-card"
-                        [class.type-card-selected]="selectedDirection() === 'Morning'"
-                        [class.input-error]="isDirectionInvalid()"
-                        (click)="selectOneWayDirection('Morning')"
-                      >
-                        <span class="type-title">
-                          {{ prefs.lang() === 'ar' ? 'الاصطحاب الصباحي فقط' : 'Morning Pickup Only' }}
-                        </span>
-                        <span class="type-desc">
-                          {{
-                            prefs.lang() === 'ar'
-                              ? 'اصطحاب صباحي من المحطة إلى المدرسة'
-                              : 'Morning pickup from your stop to school'
-                          }}
-                        </span>
-                        @if (hasStopTime(selectedStop()?.pickupTime)) {
-                          <strong class="direction-time">
-                            {{ t().pickupTimeLabel }}: <bdi dir="ltr">{{ selectedStop()?.pickupTime }}</bdi>
-                          </strong>
-                        }
-                      </button>
-
-                      <button
-                        type="button"
-                        role="radio"
-                        [attr.aria-checked]="selectedDirection() === 'Afternoon'"
-                        class="type-card direction-card"
-                        [class.type-card-selected]="selectedDirection() === 'Afternoon'"
-                        [class.input-error]="isDirectionInvalid()"
-                        (click)="selectOneWayDirection('Afternoon')"
-                      >
-                        <span class="type-title">
-                          {{ prefs.lang() === 'ar' ? 'التوصيل بعد الظهر فقط' : 'Afternoon Drop-off Only' }}
-                        </span>
-                        <span class="type-desc">
-                          {{
-                            prefs.lang() === 'ar'
-                              ? 'عودة من المدرسة إلى المحطة بعد الظهر'
-                              : 'Afternoon drop-off from school to your stop'
-                          }}
-                        </span>
-                        @if (hasStopTime(selectedStop()?.dropoffTime)) {
-                          <strong class="direction-time">
-                            {{ t().dropoffTimeLabel }}: <bdi dir="ltr">{{ selectedStop()?.dropoffTime }}</bdi>
-                          </strong>
-                        }
-                      </button>
-                    </div>
-                    @if (isDirectionInvalid()) {
-                      <p class="field-error">
-                        {{
-                          prefs.lang() === 'ar'
-                            ? 'يرجى تحديد الاصطحاب الصباحي فقط أو التوصيل بعد الظهر فقط.'
-                            : 'Please select Morning Pickup Only or Afternoon Drop-off Only.'
-                        }}
-                      </p>
-                    }
-                  </div>
-                }
-              </fieldset>
-
-              <!-- Submit Action -->
-              <div class="form-actions">
-                <button
-                  type="submit"
-                  class="btn btn-primary full-width btn-lg"
-                  [disabled]="isSubmitting() || isRouteFull() || selectedStopMissingSchedule()"
-                >
-                  @if (isSubmitting()) {
-                    <span>{{ t().submittingSubscriptionBtn }}</span>
-                  } @else {
-                    <span>{{ t().submitSubscriptionBtn }}</span>
-                  }
-                </button>
               </div>
-            </form>
+            </fieldset>
 
-            <!-- Order Summary Sidebar -->
-            <aside class="card summary-card" aria-labelledby="summary-heading">
-              <h2 id="summary-heading" class="summary-heading">{{ t().subFeeSummary }}</h2>
-
-              <div class="summary-list">
-                <div class="summary-item">
-                  <span class="summary-label">{{ t().studentNameLabel }}</span>
-                  <strong>{{ selectedStudent()?.fullName || notSelectedText() }}</strong>
-                </div>
-
-                <div class="summary-item">
-                  <span class="summary-label">{{ prefs.lang() === 'ar' ? 'مسار الحافلة' : 'Bus Route' }}</span>
-                  <strong>{{ selectedRoute()?.name || notSelectedText() }}</strong>
-                </div>
-
-                <div class="summary-item">
-                  <span class="summary-label">{{ t().selectedStopLabel }}</span>
-                  <strong>{{ selectedStop()?.name || notSelectedText() }}</strong>
-                </div>
-
-                @if (selectedStopMissingSchedule()) {
-                  <p class="field-error">
+            <!-- Step 2: Select Route -->
+            <fieldset class="form-step">
+              <legend class="step-legend">{{ t().selectRouteStep }}</legend>
+              <div class="form-group step-group">
+                <select id="routeId" formControlName="routeId" class="form-input"
+                  [class.input-error]="isFieldInvalid('routeId')"
+                  [attr.disabled]="eligibleRoutes().length === 0 ? true : null" aria-label="Bus Route Selection">
+                  <option [value]="0" disabled>{{ t().selectRoutePlaceholder }}</option>
+                  @for (r of eligibleRoutes(); track r.routeId) {
+                  <option [value]="r.routeId">
+                    {{ r.routeNumber }}: {{ r.name }} ({{ r.serviceArea }}) &bull;
+                    {{ routeRemainingSeats(r) }}
                     {{
-                      prefs.lang() === 'ar'
-                        ? 'تنبيه: مواعيد هذه المحطة غير محددة حالياً.'
-                        : 'Warning: Schedule times are not set for this stop.'
+                    prefs.lang() === 'ar'
+                    ? 'مقعد متاح'
+                    : routeRemainingSeats(r) === 1
+                    ? 'seat left'
+                    : 'seats left'
+                    }}
+                  </option>
+                  }
+                </select>
+                @if (routes().length > 0 && eligibleRoutes().length === 0) {
+                <p class="capacity-warning-text">
+                  {{
+                  prefs.lang() === 'ar'
+                  ? 'لا توجد مسارات مؤهلة للاشتراك حالياً (يجب أن يكون المسار نشطاً وبمقاعد متاحة ومعيّناً له حافلة
+                  وسائق نشطان).'
+                  : 'No eligible routes are currently available (routes must be active with available seats and an
+                  assigned active bus and driver).'
+                  }}
+                </p>
+                }
+                @if (isFieldInvalid('routeId')) {
+                <p class="field-error">{{ t().selectRoutePlaceholder }}</p>
+                }
+              </div>
+
+              <!-- Route Capacity Pill & Warning -->
+              @if (selectedRoute()) {
+              <div class="capacity-box" [class.capacity-alert]="isRouteFull()">
+                @if (hasSeatData()) {
+                <span class="capacity-title">{{ t().routeCapacityLabel }}:</span>
+                <strong class="capacity-count">{{ remainingSeats() }} / {{ selectedRoute()?.capacity }}</strong>
+                @if (isRouteFull()) {
+                <p class="capacity-warning-text">{{ t().routeFullWarning }}</p>
+                }
+                } @else {
+                <span class="capacity-title">{{ t().routeCapacityLabel }}:</span>
+                <strong class="capacity-count">—</strong>
+                }
+              </div>
+              }
+            </fieldset>
+
+            <!-- Step 3: Select Pickup Stop -->
+            <fieldset class="form-step">
+              <legend class="step-legend">{{ t().selectStopStep }}</legend>
+              <div class="form-group step-group">
+                <select id="stopId" formControlName="stopId" class="form-input"
+                  [class.input-error]="isFieldInvalid('stopId')"
+                  [attr.disabled]="availableStops().length === 0 ? true : null" aria-label="Pickup Stop Selection">
+                  <option [value]="0" disabled>{{ t().selectStopPlaceholder }}</option>
+                  @for (stop of availableStops(); track stop.stopId) {
+                  <option [value]="stop.stopId" [disabled]="!stopHasSchedule(stop)">
+                    {{ formatStopOptionLabel(stop) }}
+                  </option>
+                  }
+                </select>
+                @if (selectedStopMissingSchedule()) {
+                <p class="field-error">
+                  {{
+                  prefs.lang() === 'ar'
+                  ? 'مواعيد الصعود والنزول لهذه المحطة غير محددة حالياً، يرجى اختيار محطة أخرى.'
+                  : 'Pickup and drop-off times are not set for this stop yet. Please select another stop.'
+                  }}
+                </p>
+                } @else if (availableStops().length > 0 && schedulableStops().length === 0) {
+                <div class="capacity-box capacity-alert">
+                  <p class="capacity-warning-text">
+                    {{
+                    prefs.lang() === 'ar'
+                    ? 'لا توجد محطات بمواعيد صعود أو نزول محددة على هذا المسار حالياً، ولا يمكن إتمام الاشتراك لحين
+                    تحديد المواعيد.'
+                    : 'No stops on this route have scheduled pickup or drop-off times yet. Please wait until times are
+                    configured or select another route.'
                     }}
                   </p>
-                }
-
-                <div class="summary-item">
-                  <span class="summary-label">{{ t().transportTypeLabel }}</span>
-                  <strong>
-                    {{ subForm.get('transportType')?.value === 'RoundTrip' ? t().typeRoundTrip : t().typeOneWay }}
-                  </strong>
                 </div>
-
-                @if (selectedTransportType() === 'OneWay') {
-                  <div class="summary-item">
-                    <span class="summary-label">{{ prefs.lang() === 'ar' ? 'الاتجاه المحدد' : 'Selected Direction' }}</span>
-                    <strong>{{ selectedDirectionLabel() }}</strong>
-                  </div>
+                } @else if (hasUnscheduledStops()) {
+                <p class="stop-schedule-note">
+                  {{
+                  prefs.lang() === 'ar'
+                  ? 'ملاحظة: المحطات التي لم تُحدد مواعيدها بعد غير متاحة للاختيار لحين تسجيل مواعيد الصعود والنزول
+                  الخاصة بها.'
+                  : 'Note: Stops without scheduled pickup or drop-off times are disabled and unavailable until their
+                  times are set.'
+                  }}
+                </p>
                 }
+                @if (isFieldInvalid('stopId')) {
+                <p class="field-error">{{ t().selectStopPlaceholder }}</p>
+                }
+              </div>
+            </fieldset>
 
-                <div class="summary-divider"></div>
+            <!-- Step 4: Service Type Selection -->
+            <fieldset class="form-step">
+              <legend class="step-legend">{{ t().selectTypeStep }}</legend>
+              <div class="type-selector-grid">
+                <button type="button" class="type-card"
+                  [class.type-card-selected]="subForm.get('transportType')?.value === 'RoundTrip'"
+                  (click)="selectTransportType('RoundTrip')">
+                  <span class="type-title">{{ t().typeRoundTrip }}</span>
+                  <span class="type-desc">{{ t().typeRoundTripDesc }}</span>
+                  <strong class="type-price">300 JOD</strong>
+                </button>
 
-                <div class="summary-total">
-                  <span class="total-label">{{ t().monthlyFeeLabel }}</span>
-                  <div class="total-amount">
-                    <span class="amount-number">{{ calculatedFee() }}</span>
-                    <span class="amount-currency">JOD</span>
-                  </div>
-                </div>
+                <button type="button" class="type-card"
+                  [class.type-card-selected]="subForm.get('transportType')?.value === 'OneWay'"
+                  (click)="selectTransportType('OneWay')">
+                  <span class="type-title">{{ t().typeOneWay }}</span>
+                  <span class="type-desc">{{ t().typeOneWayDesc }}</span>
+                  <strong class="type-price">150 JOD</strong>
+                </button>
               </div>
 
-              <div class="summary-notice">
-                <p>{{ t().subConditionsNotice }}</p>
+              @if (selectedTransportType() === 'OneWay') {
+              <div class="direction-selector" role="radiogroup"
+                [attr.aria-label]="prefs.lang() === 'ar' ? 'تحديد اتجاه الاشتراك' : 'One-Way Direction Selection'">
+                <p class="direction-label">
+                  {{
+                  prefs.lang() === 'ar'
+                  ? 'حدد الاتجاه المطلوب لاشتراك الاتجاه الواحد:'
+                  : 'Choose One-Way Direction:'
+                  }}
+                </p>
+                <div class="type-selector-grid">
+                  <button type="button" role="radio" [attr.aria-checked]="selectedDirection() === 'Morning'"
+                    class="type-card direction-card" [class.type-card-selected]="selectedDirection() === 'Morning'"
+                    [class.input-error]="isDirectionInvalid()" (click)="selectOneWayDirection('Morning')">
+                    <span class="type-title">
+                      {{ prefs.lang() === 'ar' ? 'الاصطحاب الصباحي فقط' : 'Morning Pickup Only' }}
+                    </span>
+                    <span class="type-desc">
+                      {{
+                      prefs.lang() === 'ar'
+                      ? 'اصطحاب صباحي من المحطة إلى المدرسة'
+                      : 'Morning pickup from your stop to school'
+                      }}
+                    </span>
+                    @if (hasStopTime(selectedStop()?.pickupTime)) {
+                    <strong class="direction-time">
+                      {{ t().pickupTimeLabel }}: <bdi dir="ltr">{{ selectedStop()?.pickupTime }}</bdi>
+                    </strong>
+                    }
+                  </button>
+
+                  <button type="button" role="radio" [attr.aria-checked]="selectedDirection() === 'Afternoon'"
+                    class="type-card direction-card" [class.type-card-selected]="selectedDirection() === 'Afternoon'"
+                    [class.input-error]="isDirectionInvalid()" (click)="selectOneWayDirection('Afternoon')">
+                    <span class="type-title">
+                      {{ prefs.lang() === 'ar' ? 'التوصيل بعد الظهر فقط' : 'Afternoon Drop-off Only' }}
+                    </span>
+                    <span class="type-desc">
+                      {{
+                      prefs.lang() === 'ar'
+                      ? 'عودة من المدرسة إلى المحطة بعد الظهر'
+                      : 'Afternoon drop-off from school to your stop'
+                      }}
+                    </span>
+                    @if (hasStopTime(selectedStop()?.dropoffTime)) {
+                    <strong class="direction-time">
+                      {{ t().dropoffTimeLabel }}: <bdi dir="ltr">{{ selectedStop()?.dropoffTime }}</bdi>
+                    </strong>
+                    }
+                  </button>
+                </div>
+                @if (isDirectionInvalid()) {
+                <p class="field-error">
+                  {{
+                  prefs.lang() === 'ar'
+                  ? 'يرجى تحديد الاصطحاب الصباحي فقط أو التوصيل بعد الظهر فقط.'
+                  : 'Please select Morning Pickup Only or Afternoon Drop-off Only.'
+                  }}
+                </p>
+                }
               </div>
-            </aside>
-          </div>
+              }
+            </fieldset>
+
+            <!-- Submit Action -->
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary full-width btn-lg"
+                [disabled]="isSubmitting() || isRouteFull() || selectedStopMissingSchedule()">
+                @if (isSubmitting()) {
+                <span>{{ t().submittingSubscriptionBtn }}</span>
+                } @else {
+                <span>{{ t().submitSubscriptionBtn }}</span>
+                }
+              </button>
+            </div>
+          </form>
+
+          <!-- Order Summary Sidebar -->
+          <aside class="card summary-card" aria-labelledby="summary-heading">
+            <h2 id="summary-heading" class="summary-heading">{{ t().subFeeSummary }}</h2>
+
+            <div class="summary-list">
+              <div class="summary-item">
+                <span class="summary-label">{{ t().studentNameLabel }}</span>
+                <strong>{{ selectedStudent()?.fullName || notSelectedText() }}</strong>
+              </div>
+
+              <div class="summary-item">
+                <span class="summary-label">{{ prefs.lang() === 'ar' ? 'مسار الحافلة' : 'Bus Route' }}</span>
+                <strong>{{ selectedRoute()?.name || notSelectedText() }}</strong>
+              </div>
+
+              <div class="summary-item">
+                <span class="summary-label">{{ t().selectedStopLabel }}</span>
+                <strong>{{ selectedStop()?.name || notSelectedText() }}</strong>
+              </div>
+
+              @if (selectedStopMissingSchedule()) {
+              <p class="field-error">
+                {{
+                prefs.lang() === 'ar'
+                ? 'تنبيه: مواعيد هذه المحطة غير محددة حالياً.'
+                : 'Warning: Schedule times are not set for this stop.'
+                }}
+              </p>
+              }
+
+              <div class="summary-item">
+                <span class="summary-label">{{ t().transportTypeLabel }}</span>
+                <strong>
+                  {{ subForm.get('transportType')?.value === 'RoundTrip' ? t().typeRoundTrip : t().typeOneWay }}
+                </strong>
+              </div>
+
+              @if (selectedTransportType() === 'OneWay') {
+              <div class="summary-item">
+                <span class="summary-label">{{ prefs.lang() === 'ar' ? 'الاتجاه المحدد' : 'Selected Direction' }}</span>
+                <strong>{{ selectedDirectionLabel() }}</strong>
+              </div>
+              }
+
+              <div class="summary-divider"></div>
+
+              <div class="summary-total">
+                <span class="total-label">{{ t().monthlyFeeLabel }}</span>
+                <div class="total-amount">
+                  <span class="amount-number">{{ calculatedFee() }}</span>
+                  <span class="amount-currency">JOD</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="summary-notice">
+              <p>{{ t().subConditionsNotice }}</p>
+            </div>
+          </aside>
+        </div>
         }
       </div>
     </section>

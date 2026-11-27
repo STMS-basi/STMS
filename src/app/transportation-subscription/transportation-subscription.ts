@@ -115,18 +115,41 @@ export class TransportationSubscription implements OnInit {
     return r ? this.routeRemainingSeats(r) : 0;
   });
 
+  public readonly hasSeatData = computed<boolean>(() => {
+    const r = this.selectedRoute();
+    return Boolean(r && this.routeHasSeatData(r));
+  });
+
   public readonly isRouteFull = computed<boolean>(() => {
     const r = this.selectedRoute();
-    return Boolean(r && this.remainingSeats() <= 0);
+    return Boolean(r && this.hasSeatData() && this.remainingSeats() <= 0);
   });
 
   public routeRemainingSeats(route: RouteItem): number {
+    // Prefer the backend-computed remainingSeats when available
+    if (typeof route.remainingSeats === 'number' && !isNaN(route.remainingSeats)) {
+      return Math.max(0, route.remainingSeats);
+    }
+
+    // Fallback: compute from capacity − enrolledStudents (pre-API compat)
     const capacity = typeof route.capacity === 'number' && !isNaN(route.capacity) ? route.capacity : 0;
     const enrolled =
       typeof route.enrolledStudents === 'number' && !isNaN(route.enrolledStudents)
         ? route.enrolledStudents
         : 0;
     return Math.max(0, capacity - enrolled);
+  }
+
+  /** Whether the route has valid seat information (remainingSeats is not null/undefined) */
+  public routeHasSeatData(route: RouteItem): boolean {
+    if (typeof route.remainingSeats === 'number' && !isNaN(route.remainingSeats)) {
+      return true;
+    }
+    // Fallback: enrolledStudents exists
+    if (typeof route.enrolledStudents === 'number' && !isNaN(route.enrolledStudents)) {
+      return true;
+    }
+    return false;
   }
 
   private isRouteEligible(route: RouteItem): boolean {

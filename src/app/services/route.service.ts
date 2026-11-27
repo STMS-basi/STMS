@@ -19,6 +19,8 @@ export interface RouteItem {
   readonly serviceArea: string;
   readonly capacity: number;
   readonly enrolledStudents: number;
+  readonly reservedSeats?: number | null;
+  readonly remainingSeats?: number | null;
   readonly isActive: boolean;
   readonly busId?: number | null;
   readonly busPlate?: string | null;
