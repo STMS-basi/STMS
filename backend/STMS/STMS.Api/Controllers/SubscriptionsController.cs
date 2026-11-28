@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -104,6 +103,7 @@ namespace STMS.Api.Controllers
             s.StopId,
             stopName = s.Stop.Name,
             s.TransportType,
+            s.TripDirection,
             s.Fee,
             s.Status,
             s.StartDate,
@@ -143,6 +143,7 @@ namespace STMS.Api.Controllers
             s.StopId,
             stopName = s.Stop.Name,
             s.TransportType,
+            s.TripDirection,
             s.Fee,
             s.Status,
             s.StartDate,
@@ -196,6 +197,20 @@ namespace STMS.Api.Controllers
         });
       }
 
+      // Validate and normalize trip direction.
+      if (!TryResolveTripDirection(
+          request.TransportType,
+          request.TripDirection,
+          out var tripDirection))
+      {
+        return BadRequest(new
+        {
+          message = request.TransportType == "OneWay"
+              ? "OneWay subscriptions require MorningPickup or AfternoonDropoff."
+              : "RoundTrip subscriptions require Both as the trip direction."
+        });
+      }
+
       var semester = GetRegistrationSemester();
 
       if (semester == null)
@@ -245,32 +260,51 @@ namespace STMS.Api.Controllers
           .FirstOrDefaultAsync(r =>
               r.RouteId == request.RouteId);
 
-      if (route == null || !route.IsActive)
+      if (route == null || !route.IsActive ||
+          !route.BusId.HasValue || !route.DriverId.HasValue)
         return BadRequest(new
         {
           message = "Selected route is not available."
         });
 
-      var stopExists = await _context.Stops
+      // Get the selected stop and its schedule.
+      var stop = await _context.Stops
           .AsNoTracking()
-          .AnyAsync(s =>
+          .FirstOrDefaultAsync(s =>
               s.StopId == request.StopId &&
               s.RouteId == request.RouteId);
 
-      if (!stopExists)
+      if (stop == null)
         return BadRequest(new
         {
           message = "Selected stop does not belong to the route."
         });
 
+      // Validate the required stop schedule.
+      var scheduleError = ValidateStopSchedule(
+          stop,
+          tripDirection);
+
+      if (scheduleError != null)
+      {
+        return BadRequest(new
+        {
+          message = scheduleError
+        });
+      }
+
+      // Pending, AwaitingPayment and Approved block
+      // subscriptions whose dates overlap the selected semester.
+      // This also protects against legacy date ranges.
       var hasExistingSubscription =
           await _context.Subscriptions
               .AsNoTracking()
               .AnyAsync(s =>
                   s.StudentId == request.StudentId &&
-                  s.StartDate == semesterStart &&
-                  s.EndDate == semesterEnd &&
+                  s.StartDate <= semesterEnd &&
+                  s.EndDate >= semesterStart &&
                   (s.Status == "Pending" ||
+                   s.Status == "AwaitingPayment" ||
                    s.Status == "Approved"));
 
       if (hasExistingSubscription)
@@ -279,13 +313,15 @@ namespace STMS.Api.Controllers
           message = "Student already has a subscription for this semester."
         });
 
+      // All active requests overlapping this semester reserve a seat.
       var reservedSeats = await _context.Subscriptions
           .AsNoTracking()
           .CountAsync(s =>
               s.RouteId == request.RouteId &&
-              s.StartDate == semesterStart &&
-              s.EndDate == semesterEnd &&
+              s.StartDate <= semesterEnd &&
+              s.EndDate >= semesterStart &&
               (s.Status == "Pending" ||
+               s.Status == "AwaitingPayment" ||
                s.Status == "Approved"));
 
       if (reservedSeats >= route.Capacity)
@@ -304,6 +340,7 @@ namespace STMS.Api.Controllers
         RouteId = request.RouteId,
         StopId = request.StopId,
         TransportType = request.TransportType,
+        TripDirection = tripDirection,
         Fee = fee,
         Status = "Pending",
         StartDate = semesterStart,
@@ -323,6 +360,8 @@ namespace STMS.Api.Controllers
         message = "Subscription request created successfully.",
         subscriptionId = subscription.SubscriptionId,
         referenceNumber = subscription.ReferenceNumber,
+        transportType = subscription.TransportType,
+        tripDirection = subscription.TripDirection,
         fee = subscription.Fee,
         status = subscription.Status,
         startDate = subscription.StartDate,
@@ -418,9 +457,10 @@ namespace STMS.Api.Controllers
           .AsNoTracking()
           .AnyAsync(s =>
               s.StudentId == previousSubscription.StudentId &&
-              s.StartDate == semesterStart &&
-              s.EndDate == semesterEnd &&
+              s.StartDate <= semesterEnd &&
+              s.EndDate >= semesterStart &&
               (s.Status == "Pending" ||
+               s.Status == "AwaitingPayment" ||
                s.Status == "Approved"));
 
       if (alreadySubscribed)
@@ -434,19 +474,21 @@ namespace STMS.Api.Controllers
           .FirstOrDefaultAsync(r =>
               r.RouteId == previousSubscription.RouteId);
 
-      if (route == null || !route.IsActive)
+      if (route == null || !route.IsActive ||
+          !route.BusId.HasValue || !route.DriverId.HasValue)
         return BadRequest(new
         {
           message = "Previous route is no longer available. Please create a new subscription."
         });
 
-      var stopExists = await _context.Stops
+      // Get the previous stop and its current schedule.
+      var stop = await _context.Stops
           .AsNoTracking()
-          .AnyAsync(s =>
+          .FirstOrDefaultAsync(s =>
               s.StopId == previousSubscription.StopId &&
               s.RouteId == previousSubscription.RouteId);
 
-      if (!stopExists)
+      if (stop == null)
         return BadRequest(new
         {
           message = "Previous stop is no longer available. Please create a new subscription."
@@ -456,9 +498,10 @@ namespace STMS.Api.Controllers
           .AsNoTracking()
           .CountAsync(s =>
               s.RouteId == previousSubscription.RouteId &&
-              s.StartDate == semesterStart &&
-              s.EndDate == semesterEnd &&
+              s.StartDate <= semesterEnd &&
+              s.EndDate >= semesterStart &&
               (s.Status == "Pending" ||
+               s.Status == "AwaitingPayment" ||
                s.Status == "Approved"));
 
       if (reservedSeats >= route.Capacity)
@@ -474,6 +517,33 @@ namespace STMS.Api.Controllers
           message = "Previous transport type is invalid. Please create a new subscription."
         });
 
+      // Preserve the trip direction during renewal.
+      // Do not guess the direction of legacy OneWay subscriptions.
+      if (!TryResolveTripDirection(
+          previousSubscription.TransportType,
+          previousSubscription.TripDirection,
+          out var tripDirection))
+      {
+        return BadRequest(new
+        {
+          message = "Previous trip direction is missing or invalid. Please create a new subscription and select the correct trip direction."
+        });
+      }
+
+      // Ensure the previous stop supports the required direction.
+      var scheduleError = ValidateStopSchedule(
+          stop,
+          tripDirection);
+
+      if (scheduleError != null)
+      {
+        return BadRequest(new
+        {
+          message = scheduleError +
+              " Please create a new subscription with an available stop."
+        });
+      }
+
       decimal fee =
           previousSubscription.TransportType == "OneWay"
               ? 150m
@@ -485,6 +555,7 @@ namespace STMS.Api.Controllers
         RouteId = previousSubscription.RouteId,
         StopId = previousSubscription.StopId,
         TransportType = previousSubscription.TransportType,
+        TripDirection = tripDirection,
         Fee = fee,
         Status = "Pending",
         StartDate = semesterStart,
@@ -509,6 +580,7 @@ namespace STMS.Api.Controllers
         routeId = newSubscription.RouteId,
         stopId = newSubscription.StopId,
         transportType = newSubscription.TransportType,
+        tripDirection = newSubscription.TripDirection,
         fee = newSubscription.Fee,
         status = newSubscription.Status,
         startDate = newSubscription.StartDate,
@@ -538,6 +610,7 @@ namespace STMS.Api.Controllers
             s.StopId,
             stopName = s.Stop.Name,
             s.TransportType,
+            s.TripDirection,
             s.Fee,
             s.Status,
             s.StartDate,
@@ -549,68 +622,211 @@ namespace STMS.Api.Controllers
       return Ok(subscriptions);
     }
 
+    // ============================================
+    // ADMIN: PRELIMINARY APPROVAL
+    // CONCURRENCY-SAFE
+    // ============================================
+
     [HttpPatch("admin/{id:int}/approve")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ApproveSubscription(int id)
     {
-      var subscription = await _context.Subscriptions
-          .FirstOrDefaultAsync(s => s.SubscriptionId == id);
-
-      if (subscription == null)
-        return NotFound(new
+      if (id <= 0)
+        return BadRequest(new
         {
-          message = "Subscription not found."
+          message = "Valid subscription ID is required."
         });
 
-      if (subscription.Status != "Pending")
+      // Atomic conditional update:
+      // Only a Pending subscription can be accepted.
+      var affectedRows = await _context.Subscriptions
+          .Where(s =>
+              s.SubscriptionId == id &&
+              s.Status == "Pending")
+          .ExecuteUpdateAsync(setters => setters
+              .SetProperty(s => s.Status, "AwaitingPayment"));
+
+      if (affectedRows == 0)
+      {
+        var exists = await _context.Subscriptions
+            .AsNoTracking()
+            .AnyAsync(s => s.SubscriptionId == id);
+
+        if (!exists)
+          return NotFound(new
+          {
+            message = "Subscription not found."
+          });
+
         return Conflict(new
         {
           message = "Only pending subscriptions can be approved."
         });
-
-      subscription.Status = "Approved";
-      await _context.SaveChangesAsync();
+      }
 
       return Ok(new
       {
-        message = "Subscription approved successfully.",
-        subscriptionId = subscription.SubscriptionId,
-        status = subscription.Status
+        message = "Subscription accepted. Awaiting full payment confirmation.",
+        subscriptionId = id,
+        status = "AwaitingPayment"
       });
     }
+
+    // ============================================
+    // ADMIN: REJECT SUBSCRIPTION
+    // CONCURRENCY-SAFE
+    // ============================================
 
     [HttpPatch("admin/{id:int}/reject")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> RejectSubscription(int id)
     {
-      var subscription = await _context.Subscriptions
-          .FirstOrDefaultAsync(s => s.SubscriptionId == id);
-
-      if (subscription == null)
-        return NotFound(new
+      if (id <= 0)
+        return BadRequest(new
         {
-          message = "Subscription not found."
+          message = "Valid subscription ID is required."
         });
 
-      if (subscription.Status != "Pending")
+      // Atomic conditional update:
+      // Once accepted, a subscription cannot be rejected.
+      var affectedRows = await _context.Subscriptions
+          .Where(s =>
+              s.SubscriptionId == id &&
+              s.Status == "Pending")
+          .ExecuteUpdateAsync(setters => setters
+              .SetProperty(s => s.Status, "Rejected"));
+
+      if (affectedRows == 0)
+      {
+        var exists = await _context.Subscriptions
+            .AsNoTracking()
+            .AnyAsync(s => s.SubscriptionId == id);
+
+        if (!exists)
+          return NotFound(new
+          {
+            message = "Subscription not found."
+          });
+
         return Conflict(new
         {
           message = "Only pending subscriptions can be rejected."
         });
-
-      subscription.Status = "Rejected";
-      await _context.SaveChangesAsync();
+      }
 
       return Ok(new
       {
         message = "Subscription rejected successfully.",
-        subscriptionId = subscription.SubscriptionId,
-        status = subscription.Status
+        subscriptionId = id,
+        status = "Rejected"
       });
     }
 
     // ============================================
-    // HELPERS
+    // HELPERS: TRIP DIRECTION
+    // ============================================
+
+    private static bool TryResolveTripDirection(
+        string transportType,
+        string? requestedDirection,
+        out string tripDirection)
+    {
+      tripDirection = string.Empty;
+
+      var direction = requestedDirection?.Trim();
+
+      if (transportType == "OneWay")
+      {
+        if (string.Equals(
+            direction,
+            "MorningPickup",
+            StringComparison.OrdinalIgnoreCase))
+        {
+          tripDirection = "MorningPickup";
+          return true;
+        }
+
+        if (string.Equals(
+            direction,
+            "AfternoonDropoff",
+            StringComparison.OrdinalIgnoreCase))
+        {
+          tripDirection = "AfternoonDropoff";
+          return true;
+        }
+
+        return false;
+      }
+
+      if (transportType == "RoundTrip")
+      {
+        // RoundTrip always includes both directions.
+        // A missing direction is accepted for compatibility.
+        if (string.IsNullOrWhiteSpace(direction) ||
+            string.Equals(
+                direction,
+                "Both",
+                StringComparison.OrdinalIgnoreCase))
+        {
+          tripDirection = "Both";
+          return true;
+        }
+
+        return false;
+      }
+
+      return false;
+    }
+
+    // ============================================
+    // HELPERS: STOP SCHEDULE VALIDATION
+    // ============================================
+
+    private static string? ValidateStopSchedule(
+        Stop stop,
+        string tripDirection)
+    {
+      bool hasPickupTime =
+          !string.IsNullOrWhiteSpace(stop.PickupTime);
+
+      bool hasDropoffTime =
+          !string.IsNullOrWhiteSpace(stop.DropoffTime);
+
+      if (tripDirection == "MorningPickup")
+      {
+        if (!hasPickupTime)
+        {
+          return "Selected stop does not have a morning pickup time.";
+        }
+
+        return null;
+      }
+
+      if (tripDirection == "AfternoonDropoff")
+      {
+        if (!hasDropoffTime)
+        {
+          return "Selected stop does not have an afternoon dropoff time.";
+        }
+
+        return null;
+      }
+
+      if (tripDirection == "Both")
+      {
+        if (!hasPickupTime || !hasDropoffTime)
+        {
+          return "RoundTrip requires both pickup and dropoff times at the selected stop.";
+        }
+
+        return null;
+      }
+
+      return "Invalid trip direction.";
+    }
+
+    // ============================================
+    // HELPERS: CONCURRENCY PROTECTION
     // ============================================
 
     // Requires an active EF Core transaction.
@@ -668,6 +884,10 @@ namespace STMS.Api.Controllers
       return await reader.ReadAsync();
     }
 
+    // ============================================
+    // HELPERS: SCHOOL SEMESTERS
+    // ============================================
+
     private (DateTime StartDate, DateTime EndDate)?
         GetRegistrationSemester()
     {
@@ -720,6 +940,10 @@ namespace STMS.Api.Controllers
           .OrderByDescending(s => s.StartDate)
           .First();
     }
+
+    // ============================================
+    // HELPERS: AUTHENTICATED PARENT
+    // ============================================
 
     private async Task<int?> GetParentIdAsync()
     {

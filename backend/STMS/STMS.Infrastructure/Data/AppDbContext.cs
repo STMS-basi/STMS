@@ -4,9 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
-
-
 using STMS.Core.Entities;
 
 namespace STMS.Infrastructure.Data
@@ -367,6 +364,11 @@ namespace STMS.Infrastructure.Data
               .HasMaxLength(20)
               .IsRequired();
 
+        entity.Property(e => e.TripDirection)
+              .HasColumnName("TRIPDIRECTION")
+              .HasMaxLength(20)
+              .IsRequired(false);
+
         entity.Property(e => e.Fee)
               .HasColumnName("FEE")
               .HasColumnType("NUMBER(10,2)")
@@ -499,7 +501,6 @@ namespace STMS.Infrastructure.Data
               .HasForeignKey(e => e.SubscriptionId)
               .OnDelete(DeleteBehavior.NoAction);
       });
-
     }
   }
 }

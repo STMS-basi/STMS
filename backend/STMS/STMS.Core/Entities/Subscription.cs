@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-
 namespace STMS.Core.Entities
 {
   public class Subscription
@@ -21,6 +20,8 @@ namespace STMS.Core.Entities
 
     public string TransportType { get; set; } = string.Empty;
 
+    public string? TripDirection { get; set; }
+
     public decimal Fee { get; set; }
 
     public string Status { get; set; } = "Pending";
@@ -30,6 +31,7 @@ namespace STMS.Core.Entities
     public DateTime EndDate { get; set; }
 
     public DateTime RequestedAt { get; set; }
+
     public Student Student { get; set; } = null!;
 
     public Route Route { get; set; } = null!;

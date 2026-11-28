@@ -162,7 +162,7 @@ CREATE TABLE SUBSCRIPTIONS (
     CONSTRAINT CK_SUBS_TYPE
         CHECK (TransportType IN ('OneWay', 'RoundTrip')),
     CONSTRAINT CK_SUBS_STATUS
-        CHECK (Status IN ('Pending', 'Approved', 'Rejected', 'Cancelled')),
+        CHECK (Status IN ('Pending', 'AwaitingPayment', 'Approved', 'Rejected', 'Cancelled')),
     CONSTRAINT CK_SUBS_FEE CHECK (Fee >= 0),
     CONSTRAINT CK_SUBS_DATES CHECK (EndDate >= StartDate)
 );

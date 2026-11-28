@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using STMS.Api.DTOs.Routes;
 using STMS.Infrastructure.Data;
+using System.Globalization;
 
 namespace STMS.Api.Controllers
 {
@@ -13,10 +14,14 @@ namespace STMS.Api.Controllers
   public class RoutesController : ControllerBase
   {
     private readonly AppDbContext _context;
+    private readonly IConfiguration _configuration;
 
-    public RoutesController(AppDbContext context)
+    public RoutesController(
+        AppDbContext context,
+        IConfiguration configuration)
     {
       _context = context;
+      _configuration = configuration;
     }
 
     // GET /api/routes
@@ -63,7 +68,70 @@ namespace STMS.Api.Controllers
           })
           .ToListAsync();
 
-      return Ok(routes);
+      var semester = GetRegistrationSemester();
+
+      var reservations = new Dictionary<int, int>();
+
+      if (semester.HasValue && routes.Count > 0)
+      {
+        var semesterStart = semester.Value.StartDate;
+        var semesterEnd = semester.Value.EndDate;
+
+        reservations = await _context.Subscriptions
+            .AsNoTracking()
+            .Where(s =>
+                s.StartDate <= semesterEnd &&
+                s.EndDate >= semesterStart &&
+                (s.Status == "Pending" ||
+                 s.Status == "AwaitingPayment" ||
+                 s.Status == "Approved"))
+            .GroupBy(s => s.RouteId)
+            .Select(g => new
+            {
+              RouteId = g.Key,
+              Count = g.Count()
+            })
+            .ToDictionaryAsync(
+                g => g.RouteId,
+                g => g.Count);
+      }
+
+      return Ok(routes.Select(r =>
+      {
+        var reserved = reservations.TryGetValue(
+            r.RouteId, out var count)
+            ? count
+            : 0;
+
+        return new
+        {
+          r.RouteId,
+          r.RouteNumber,
+          r.Name,
+          r.StartPoint,
+          r.Destination,
+          r.ServiceArea,
+          r.Capacity,
+          r.BusId,
+          r.DriverId,
+          r.IsActive,
+
+          registrationOpen = semester.HasValue,
+
+          semesterStart = semester?.StartDate,
+
+          semesterEnd = semester?.EndDate,
+
+          reservedSeats = semester.HasValue
+                ? (int?)reserved
+                : null,
+
+          remainingSeats = semester.HasValue
+                ? (int?)Math.Max(
+                    0, r.Capacity - reserved)
+                : null
+        };
+      }).ToList());
     }
 
     // GET /api/routes/areas
@@ -76,7 +144,8 @@ namespace STMS.Api.Controllers
 
       var areas = routes
           .Select(r => r.ServiceArea)
-          .Where(area => !string.IsNullOrWhiteSpace(area))
+          .Where(area =>
+              !string.IsNullOrWhiteSpace(area))
           .Distinct(StringComparer.OrdinalIgnoreCase)
           .OrderBy(area => area)
           .ToList();
@@ -182,38 +251,56 @@ namespace STMS.Api.Controllers
         });
       }
 
+      // A route may be active only when both
+      // a bus and a driver are assigned.
+
+      // When either assignment is missing,
+      // create the route as inactive.
+
+      var shouldBeActive =
+          request.BusId.HasValue &&
+          request.DriverId.HasValue;
+
       var routeNumber = request.RouteNumber.Trim();
 
       await using var transaction =
           await _context.Database.BeginTransactionAsync();
 
+      // Lock order: bus, then driver.
+
       if (request.BusId.HasValue)
       {
-        var busLocked =
-            await LockBusAsync(request.BusId.Value);
-
-        if (!busLocked)
+        if (!await LockBusAsync(request.BusId.Value))
         {
           return BadRequest(new
           {
-            message = "Bus not found or inactive."
+            message = "Bus not found."
           });
         }
 
-        var assignedBus = await _context.Buses
+        var bus = await _context.Buses
             .AsNoTracking()
             .FirstOrDefaultAsync(b =>
                 b.BusId == request.BusId.Value);
 
-        if (assignedBus == null || !assignedBus.IsActive)
+        if (bus == null)
         {
           return BadRequest(new
           {
-            message = "Bus not found or inactive."
+            message = "Bus not found."
           });
         }
 
-        if (assignedBus.Capacity < request.Capacity)
+        if (shouldBeActive && !bus.IsActive)
+        {
+          return BadRequest(new
+          {
+            message =
+                  "Cannot activate a route with an inactive bus."
+          });
+        }
+
+        if (bus.Capacity < request.Capacity)
         {
           return BadRequest(new
           {
@@ -222,52 +309,80 @@ namespace STMS.Api.Controllers
           });
         }
 
-        // Check active bus assignments in C#.
-        // Avoid Oracle Boolean translation issues.
-        var busRoutes = await _context.Routes
+        if (shouldBeActive)
+        {
+          var busRoutes = await _context.Routes
+              .AsNoTracking()
+              .Where(r =>
+                  r.BusId == request.BusId.Value)
+              .Select(r => new { r.IsActive })
+              .ToListAsync();
+
+          if (busRoutes.Any(r => r.IsActive))
+          {
+            return Conflict(new
+            {
+              message =
+                    "Bus is already assigned to another active route."
+            });
+          }
+        }
+      }
+
+      if (request.DriverId.HasValue)
+      {
+        if (!await LockDriverAsync(
+            request.DriverId.Value))
+        {
+          return BadRequest(new
+          {
+            message = "Driver not found."
+          });
+        }
+
+        var driver = await _context.Drivers
             .AsNoTracking()
-            .Where(r => r.BusId == request.BusId.Value)
-            .ToListAsync();
+            .FirstOrDefaultAsync(d =>
+                d.DriverId == request.DriverId.Value);
 
-        var busAlreadyAssigned =
-            busRoutes.Any(r => r.IsActive);
+        if (driver == null)
+        {
+          return BadRequest(new
+          {
+            message = "Driver not found."
+          });
+        }
 
-        if (busAlreadyAssigned)
+        if (shouldBeActive && !driver.IsActive)
+        {
+          return BadRequest(new
+          {
+            message =
+                  "Cannot activate a route with an inactive driver."
+          });
+        }
+
+        if (shouldBeActive &&
+            await HasOtherActiveDriverRouteAsync(
+                request.DriverId.Value))
         {
           return Conflict(new
           {
             message =
-                  "Bus is already assigned to another active route."
+                  "Driver is already assigned to another active route."
           });
         }
       }
 
-      var exists = await _context.Routes
+      var duplicate = await _context.Routes
           .AnyAsync(r => r.RouteNumber == routeNumber);
 
-      if (exists)
+      if (duplicate)
       {
         return Conflict(new
         {
           message = "Route number already exists."
         });
-      }
-
-      if (request.DriverId.HasValue)
-      {
-        // FIX: Fetch driver first, then check IsActive in C#.
-        var assignedDriver = await _context.Drivers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(d =>
-                d.DriverId == request.DriverId.Value);
-
-        if (assignedDriver == null || !assignedDriver.IsActive)
-        {
-          return BadRequest(new
-          {
-            message = "Driver not found or inactive."
-          });
-        }
       }
 
       var route = new STMS.Core.Entities.Route
@@ -280,7 +395,7 @@ namespace STMS.Api.Controllers
         Capacity = request.Capacity,
         BusId = request.BusId,
         DriverId = request.DriverId,
-        IsActive = request.BusId.HasValue
+        IsActive = shouldBeActive
       };
 
       _context.Routes.Add(route);
@@ -327,24 +442,27 @@ namespace STMS.Api.Controllers
       await using var transaction =
           await _context.Database.BeginTransactionAsync();
 
-      // Lock requested bus before route.
-      if (request.BusId.HasValue)
-      {
-        var busLocked =
-            await LockBusAsync(request.BusId.Value);
+      // Lock order: bus, driver, route.
 
-        if (!busLocked)
+      if (request.BusId.HasValue &&
+          !await LockBusAsync(request.BusId.Value))
+      {
+        return BadRequest(new
         {
-          return BadRequest(new
-          {
-            message = "Bus not found or inactive."
-          });
-        }
+          message = "Bus not found."
+        });
       }
 
-      var routeExists = await LockRouteAsync(id);
+      if (request.DriverId.HasValue &&
+          !await LockDriverAsync(request.DriverId.Value))
+      {
+        return BadRequest(new
+        {
+          message = "Driver not found."
+        });
+      }
 
-      if (!routeExists)
+      if (!await LockRouteAsync(id))
       {
         return NotFound(new
         {
@@ -363,12 +481,44 @@ namespace STMS.Api.Controllers
         });
       }
 
-      if (route.IsActive && !request.BusId.HasValue)
+      // An active route must always retain
+      // both its bus and its driver.
+
+      if (route.IsActive &&
+          (!request.BusId.HasValue ||
+           !request.DriverId.HasValue))
       {
         return Conflict(new
         {
           message =
-                "Cannot remove the bus from an active route. Deactivate the route first."
+                "An active route must have both an assigned bus and an assigned driver. Deactivate the route before removing either assignment."
+        });
+      }
+
+      // Protect route details for current
+      // and future semesters.
+
+      var hasProtectedSubscriptions =
+          await HasProtectedSubscriptionsAsync(id);
+
+      if (hasProtectedSubscriptions &&
+          (!string.Equals(
+              route.StartPoint,
+              request.StartPoint.Trim(),
+              StringComparison.Ordinal) ||
+           !string.Equals(
+              route.Destination,
+              request.Destination.Trim(),
+              StringComparison.Ordinal) ||
+           !string.Equals(
+              route.ServiceArea,
+              request.ServiceArea.Trim(),
+              StringComparison.Ordinal)))
+      {
+        return Conflict(new
+        {
+          message =
+                "Cannot change route start point, destination or service area while protected subscriptions exist."
         });
       }
 
@@ -389,20 +539,29 @@ namespace STMS.Api.Controllers
 
       if (request.BusId.HasValue)
       {
-        var assignedBus = await _context.Buses
+        var bus = await _context.Buses
             .AsNoTracking()
             .FirstOrDefaultAsync(b =>
                 b.BusId == request.BusId.Value);
 
-        if (assignedBus == null || !assignedBus.IsActive)
+        if (bus == null)
         {
           return BadRequest(new
           {
-            message = "Bus not found or inactive."
+            message = "Bus not found."
           });
         }
 
-        if (assignedBus.Capacity < request.Capacity)
+        if (route.IsActive && !bus.IsActive)
+        {
+          return BadRequest(new
+          {
+            message =
+                  "Cannot assign an inactive bus to an active route."
+          });
+        }
+
+        if (bus.Capacity < request.Capacity)
         {
           return BadRequest(new
           {
@@ -411,7 +570,6 @@ namespace STMS.Api.Controllers
           });
         }
 
-        // Only active routes must have an exclusive bus.
         if (route.IsActive)
         {
           var busRoutes = await _context.Routes
@@ -419,12 +577,10 @@ namespace STMS.Api.Controllers
               .Where(r =>
                   r.BusId == request.BusId.Value &&
                   r.RouteId != id)
+              .Select(r => new { r.IsActive })
               .ToListAsync();
 
-          var busAlreadyAssigned =
-              busRoutes.Any(r => r.IsActive);
-
-          if (busAlreadyAssigned)
+          if (busRoutes.Any(r => r.IsActive))
           {
             return Conflict(new
             {
@@ -437,22 +593,40 @@ namespace STMS.Api.Controllers
 
       if (request.DriverId.HasValue)
       {
-        // FIX: Avoid AnyAsync with IsActive.
-        var assignedDriver = await _context.Drivers
+        var driver = await _context.Drivers
             .AsNoTracking()
             .FirstOrDefaultAsync(d =>
                 d.DriverId == request.DriverId.Value);
 
-        if (assignedDriver == null || !assignedDriver.IsActive)
+        if (driver == null)
         {
           return BadRequest(new
           {
-            message = "Driver not found or inactive."
+            message = "Driver not found."
+          });
+        }
+
+        if (route.IsActive && !driver.IsActive)
+        {
+          return BadRequest(new
+          {
+            message =
+                  "Cannot assign an inactive driver to an active route."
+          });
+        }
+
+        if (route.IsActive &&
+            await HasOtherActiveDriverRouteAsync(
+                request.DriverId.Value, id))
+        {
+          return Conflict(new
+          {
+            message =
+                  "Driver is already assigned to another active route."
           });
         }
       }
 
-      // Protect existing reservations by semester.
       var maxReservedSeats =
           await GetMaximumProtectedReservationsAsync(id);
 
@@ -462,6 +636,7 @@ namespace STMS.Api.Controllers
         {
           message =
                 "Route capacity cannot be smaller than existing reservations for an active or future semester.",
+
           minimumCapacity = maxReservedSeats
         });
       }
@@ -474,6 +649,10 @@ namespace STMS.Api.Controllers
       route.Capacity = request.Capacity;
       route.BusId = request.BusId;
       route.DriverId = request.DriverId;
+
+      // PUT does not change route active status.
+      // Inactive routes remain inactive until
+      // the activation endpoint is called.
 
       await _context.SaveChangesAsync();
       await transaction.CommitAsync();
@@ -494,9 +673,7 @@ namespace STMS.Api.Controllers
       await using var transaction =
           await _context.Database.BeginTransactionAsync();
 
-      var routeExists = await LockRouteAsync(id);
-
-      if (!routeExists)
+      if (!await LockRouteAsync(id))
       {
         return NotFound(new
         {
@@ -523,18 +700,12 @@ namespace STMS.Api.Controllers
         });
       }
 
-      var hasActiveSubscriptions =
-          await _context.Subscriptions.AnyAsync(s =>
-              s.RouteId == id &&
-              (s.Status == "Pending" ||
-               s.Status == "Approved"));
-
-      if (hasActiveSubscriptions)
+      if (await HasProtectedSubscriptionsAsync(id))
       {
         return Conflict(new
         {
           message =
-                "Cannot deactivate a route with pending or approved subscriptions."
+                "Cannot deactivate a route with protected subscriptions."
         });
       }
 
@@ -556,11 +727,11 @@ namespace STMS.Api.Controllers
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ActivateRoute(int id)
     {
-      var routeSnapshot = await _context.Routes
+      var snapshot = await _context.Routes
           .AsNoTracking()
           .FirstOrDefaultAsync(r => r.RouteId == id);
 
-      if (routeSnapshot == null)
+      if (snapshot == null)
       {
         return NotFound(new
         {
@@ -568,24 +739,27 @@ namespace STMS.Api.Controllers
         });
       }
 
-      if (!routeSnapshot.BusId.HasValue)
+      // Both assignments are mandatory.
+
+      if (!snapshot.BusId.HasValue ||
+          !snapshot.DriverId.HasValue)
       {
         return Conflict(new
         {
           message =
-                "Cannot activate a route without an assigned bus."
+                "Cannot activate a route without both an assigned bus and an assigned driver."
         });
       }
 
-      var expectedBusId = routeSnapshot.BusId.Value;
+      int expectedBusId = snapshot.BusId.Value;
+      int expectedDriverId = snapshot.DriverId.Value;
 
       await using var transaction =
           await _context.Database.BeginTransactionAsync();
 
-      // Lock bus before route.
-      var busLocked = await LockBusAsync(expectedBusId);
+      // Lock order: bus, driver, route.
 
-      if (!busLocked)
+      if (!await LockBusAsync(expectedBusId))
       {
         return BadRequest(new
         {
@@ -594,9 +768,16 @@ namespace STMS.Api.Controllers
         });
       }
 
-      var routeExists = await LockRouteAsync(id);
+      if (!await LockDriverAsync(expectedDriverId))
+      {
+        return BadRequest(new
+        {
+          message =
+                "Cannot activate route because its assigned driver is missing."
+        });
+      }
 
-      if (!routeExists)
+      if (!await LockRouteAsync(id))
       {
         return NotFound(new
         {
@@ -615,12 +796,13 @@ namespace STMS.Api.Controllers
         });
       }
 
-      if (route.BusId != expectedBusId)
+      if (route.BusId != expectedBusId ||
+          route.DriverId != expectedDriverId)
       {
         return Conflict(new
         {
           message =
-                "Route bus assignment changed. Please retry activation."
+                "Route assignment changed. Please retry activation."
         });
       }
 
@@ -632,12 +814,12 @@ namespace STMS.Api.Controllers
         });
       }
 
-      var assignedBus = await _context.Buses
+      var bus = await _context.Buses
           .AsNoTracking()
           .FirstOrDefaultAsync(b =>
               b.BusId == expectedBusId);
 
-      if (assignedBus == null || !assignedBus.IsActive)
+      if (bus == null || !bus.IsActive)
       {
         return BadRequest(new
         {
@@ -646,7 +828,7 @@ namespace STMS.Api.Controllers
         });
       }
 
-      if (assignedBus.Capacity < route.Capacity)
+      if (bus.Capacity < route.Capacity)
       {
         return BadRequest(new
         {
@@ -655,18 +837,15 @@ namespace STMS.Api.Controllers
         });
       }
 
-      // Prevent two active routes sharing one bus.
       var busRoutes = await _context.Routes
           .AsNoTracking()
           .Where(r =>
               r.BusId == expectedBusId &&
               r.RouteId != id)
+          .Select(r => new { r.IsActive })
           .ToListAsync();
 
-      var busAlreadyAssigned =
-          busRoutes.Any(r => r.IsActive);
-
-      if (busAlreadyAssigned)
+      if (busRoutes.Any(r => r.IsActive))
       {
         return Conflict(new
         {
@@ -675,22 +854,28 @@ namespace STMS.Api.Controllers
         });
       }
 
-      if (route.DriverId.HasValue)
-      {
-        // FIX: Check driver status after loading the entity.
-        var assignedDriver = await _context.Drivers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(d =>
-                d.DriverId == route.DriverId.Value);
+      var driver = await _context.Drivers
+          .AsNoTracking()
+          .FirstOrDefaultAsync(d =>
+              d.DriverId == expectedDriverId);
 
-        if (assignedDriver == null || !assignedDriver.IsActive)
+      if (driver == null || !driver.IsActive)
+      {
+        return BadRequest(new
         {
-          return BadRequest(new
-          {
-            message =
-                  "Cannot activate route because its assigned driver is inactive or missing."
-          });
-        }
+          message =
+                "Cannot activate route because its assigned driver is inactive or missing."
+        });
+      }
+
+      if (await HasOtherActiveDriverRouteAsync(
+          expectedDriverId, id))
+      {
+        return Conflict(new
+        {
+          message =
+                "Driver is already assigned to another active route."
+        });
       }
 
       var maxReservedSeats =
@@ -702,6 +887,7 @@ namespace STMS.Api.Controllers
         {
           message =
                 "Cannot activate route because its capacity is smaller than existing reservations.",
+
           minimumCapacity = maxReservedSeats
         });
       }
@@ -719,94 +905,177 @@ namespace STMS.Api.Controllers
       });
     }
 
-    // ============================================
+    // ========================================
     // HELPERS
-    // ============================================
+    // ========================================
 
-    // Maximum protected reservations in one semester.
-    private async Task<int> GetMaximumProtectedReservationsAsync(
+    // Determine the semester currently
+    // available for registration.
+
+    private (DateTime StartDate, DateTime EndDate)?
+        GetRegistrationSemester()
+    {
+      var registrationDays = _configuration.GetValue<int>(
+          "SchoolSemesters:RegistrationOpenDaysBefore", 14);
+
+      if (registrationDays < 0)
+      {
+        registrationDays = 14;
+      }
+
+      var today = DateTime.Today;
+
+      var available =
+          new List<(DateTime StartDate, DateTime EndDate)>();
+
+      foreach (var section in _configuration
+          .GetSection("SchoolSemesters:Semesters")
+          .GetChildren())
+      {
+        var startText = section["StartDate"];
+        var endText = section["EndDate"];
+
+        if (!DateTime.TryParseExact(
+                startText,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var start) ||
+
+            !DateTime.TryParseExact(
+                endText,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var end) ||
+
+            end < start)
+        {
+          continue;
+        }
+
+        if (today >= start.AddDays(-registrationDays) &&
+            today <= end)
+        {
+          available.Add((start, end));
+        }
+      }
+
+      if (available.Count == 0)
+      {
+        return null;
+      }
+
+      return available
+          .OrderByDescending(s => s.StartDate)
+          .First();
+    }
+
+    private async Task<bool> HasProtectedSubscriptionsAsync(
         int routeId)
+    {
+      return await _context.Subscriptions
+          .AsNoTracking()
+          .AnyAsync(s =>
+              s.RouteId == routeId &&
+              s.EndDate >= DateTime.Today &&
+              (s.Status == "Pending" ||
+               s.Status == "AwaitingPayment" ||
+               s.Status == "Approved"));
+    }
+
+    private async Task<int>
+        GetMaximumProtectedReservationsAsync(int routeId)
     {
       var today = DateTime.Today;
 
-      var reservationsBySemester =
-          await _context.Subscriptions
-              .AsNoTracking()
-              .Where(s =>
-                  s.RouteId == routeId &&
-                  s.EndDate >= today &&
-                  (s.Status == "Pending" ||
-                   s.Status == "Approved"))
-              .GroupBy(s => new
-              {
-                s.StartDate,
-                s.EndDate
-              })
-              .Select(g => g.Count())
-              .ToListAsync();
+      var counts = await _context.Subscriptions
+          .AsNoTracking()
+          .Where(s =>
+              s.RouteId == routeId &&
+              s.EndDate >= today &&
+              (s.Status == "Pending" ||
+               s.Status == "AwaitingPayment" ||
+               s.Status == "Approved"))
+          .GroupBy(s => new
+          {
+            s.StartDate,
+            s.EndDate
+          })
+          .Select(g => g.Count())
+          .ToListAsync();
 
-      return reservationsBySemester.Count == 0
+      return counts.Count == 0
           ? 0
-          : reservationsBySemester.Max();
+          : counts.Max();
     }
 
-    // Lock bus row in Oracle.
+    private async Task<bool> HasOtherActiveDriverRouteAsync(
+        int driverId,
+        int? excludedRouteId = null)
+    {
+      var routes = await _context.Routes
+          .AsNoTracking()
+          .Where(r =>
+              r.DriverId == driverId &&
+              (!excludedRouteId.HasValue ||
+               r.RouteId != excludedRouteId.Value))
+          .Select(r => new
+          {
+            r.IsActive
+          })
+          .ToListAsync();
+
+      return routes.Any(r => r.IsActive);
+    }
+
     private async Task<bool> LockBusAsync(int busId)
     {
-      var currentTransaction =
-          _context.Database.CurrentTransaction
-          ?? throw new InvalidOperationException(
-              "An active transaction is required.");
-
-      var connection = _context.Database.GetDbConnection();
-
-      await using var command = connection.CreateCommand();
-
-      command.Transaction =
-          currentTransaction.GetDbTransaction();
-
-      command.CommandText =
-          "SELECT BUSID FROM BUSES " +
-          "WHERE BUSID = :id FOR UPDATE";
-
-      command.CommandTimeout = 30;
-
-      var parameter = command.CreateParameter();
-      parameter.ParameterName = "id";
-      parameter.Value = busId;
-
-      command.Parameters.Add(parameter);
-
-      await using var reader =
-          await command.ExecuteReaderAsync();
-
-      return await reader.ReadAsync();
+      return await LockRowAsync(
+          "BUSES", "BUSID", busId);
     }
 
-    // Lock route row in Oracle.
+    private async Task<bool> LockDriverAsync(int driverId)
+    {
+      return await LockRowAsync(
+          "DRIVERS", "DRIVERID", driverId);
+    }
+
     private async Task<bool> LockRouteAsync(int routeId)
     {
-      var currentTransaction =
+      return await LockRowAsync(
+          "ROUTES", "ROUTEID", routeId);
+    }
+
+    private async Task<bool> LockRowAsync(
+        string tableName,
+        string columnName,
+        int id)
+    {
+      var transaction =
           _context.Database.CurrentTransaction
           ?? throw new InvalidOperationException(
               "An active transaction is required.");
 
-      var connection = _context.Database.GetDbConnection();
+      var connection =
+          _context.Database.GetDbConnection();
 
-      await using var command = connection.CreateCommand();
+      await using var command =
+          connection.CreateCommand();
 
       command.Transaction =
-          currentTransaction.GetDbTransaction();
+          transaction.GetDbTransaction();
 
       command.CommandText =
-          "SELECT ROUTEID FROM ROUTES " +
-          "WHERE ROUTEID = :id FOR UPDATE";
+          $"SELECT {columnName} FROM {tableName} " +
+          $"WHERE {columnName} = :id FOR UPDATE";
 
       command.CommandTimeout = 30;
 
       var parameter = command.CreateParameter();
+
       parameter.ParameterName = "id";
-      parameter.Value = routeId;
+      parameter.Value = id;
 
       command.Parameters.Add(parameter);
 

@@ -1,4 +1,3 @@
-
 namespace STMS.Api.DTOs.Subscriptions
 {
   public class CreateSubscriptionRequest
@@ -10,5 +9,7 @@ namespace STMS.Api.DTOs.Subscriptions
     public int StopId { get; set; }
 
     public string TransportType { get; set; } = string.Empty;
+
+    public string? TripDirection { get; set; }
   }
 }

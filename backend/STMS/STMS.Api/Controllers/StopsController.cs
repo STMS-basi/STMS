@@ -1,7 +1,10 @@
 
+using System;
+using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using STMS.Api.DTOs.Stops;
 using STMS.Infrastructure.Data;
 
@@ -54,7 +57,7 @@ namespace STMS.Api.Controllers
     }
 
     // GET /api/stops/{id}
-    // Public: Get stop details
+    // Public: Get details of a stop on an active route
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetStopById(int id)
     {
@@ -70,8 +73,6 @@ namespace STMS.Api.Controllers
         });
       }
 
-      // Check route status separately
-      // to avoid Oracle Boolean translation issues
       var route = await _context.Routes
           .AsNoTracking()
           .FirstOrDefaultAsync(r => r.RouteId == stop.RouteId);
@@ -96,7 +97,7 @@ namespace STMS.Api.Controllers
     }
 
     // POST /api/stops/admin
-    // Admin: Create a new stop
+    // Admin: Create a stop
     [HttpPost("admin")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CreateStop(
@@ -118,9 +119,22 @@ namespace STMS.Api.Controllers
         });
       }
 
+      await using var transaction =
+          await _context.Database.BeginTransactionAsync();
+
+      // Lock the route to serialize stop operations.
+      if (!await LockRouteAsync(request.RouteId))
+      {
+        return BadRequest(new
+        {
+          message = "Route not found or inactive."
+        });
+      }
+
       var route = await _context.Routes
           .AsNoTracking()
-          .FirstOrDefaultAsync(r => r.RouteId == request.RouteId);
+          .FirstOrDefaultAsync(r =>
+              r.RouteId == request.RouteId);
 
       if (route == null || !route.IsActive)
       {
@@ -130,7 +144,6 @@ namespace STMS.Api.Controllers
         });
       }
 
-      // Prevent duplicate stop order in the same route
       var duplicateOrder = await _context.Stops
           .AnyAsync(s =>
               s.RouteId == request.RouteId &&
@@ -154,7 +167,21 @@ namespace STMS.Api.Controllers
       };
 
       _context.Stops.Add(stop);
-      await _context.SaveChangesAsync();
+
+      try
+      {
+        await _context.SaveChangesAsync();
+      }
+      catch (DbUpdateException ex)
+          when (ContainsOracleError(ex, "ORA-00001"))
+      {
+        return Conflict(new
+        {
+          message = "Stop order already exists for this route."
+        });
+      }
+
+      await transaction.CommitAsync();
 
       return StatusCode(201, new
       {
@@ -166,24 +193,13 @@ namespace STMS.Api.Controllers
     }
 
     // PUT /api/stops/admin/{id}
-    // Admin: Update an existing stop
+    // Admin: Update stop with subscription protection
     [HttpPut("admin/{id:int}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateStop(
         int id,
         [FromBody] UpdateStopRequest request)
     {
-      var stop = await _context.Stops
-          .FirstOrDefaultAsync(s => s.StopId == id);
-
-      if (stop == null)
-      {
-        return NotFound(new
-        {
-          message = "Stop not found."
-        });
-      }
-
       if (string.IsNullOrWhiteSpace(request.Name))
       {
         return BadRequest(new
@@ -200,9 +216,74 @@ namespace STMS.Api.Controllers
         });
       }
 
+      var snapshot = await _context.Stops
+          .AsNoTracking()
+          .FirstOrDefaultAsync(s => s.StopId == id);
+
+      if (snapshot == null)
+      {
+        return NotFound(new
+        {
+          message = "Stop not found."
+        });
+      }
+
+      await using var transaction =
+          await _context.Database.BeginTransactionAsync();
+
+      // Lock involved routes in a consistent order.
+      var routeIds = new[]
+      {
+                snapshot.RouteId,
+                request.RouteId
+            }
+      .Distinct()
+      .OrderBy(routeId => routeId)
+      .ToList();
+
+      foreach (var routeId in routeIds)
+      {
+        if (!await LockRouteAsync(routeId))
+        {
+          return BadRequest(new
+          {
+            message = "Route not found or inactive."
+          });
+        }
+      }
+
+      if (!await LockStopAsync(id))
+      {
+        return NotFound(new
+        {
+          message = "Stop not found."
+        });
+      }
+
+      var stop = await _context.Stops
+          .FirstOrDefaultAsync(s => s.StopId == id);
+
+      if (stop == null)
+      {
+        return NotFound(new
+        {
+          message = "Stop not found."
+        });
+      }
+
+      // Detect a route change made by another request.
+      if (stop.RouteId != snapshot.RouteId)
+      {
+        return Conflict(new
+        {
+          message = "Stop was modified concurrently. Please retry."
+        });
+      }
+
       var route = await _context.Routes
           .AsNoTracking()
-          .FirstOrDefaultAsync(r => r.RouteId == request.RouteId);
+          .FirstOrDefaultAsync(r =>
+              r.RouteId == request.RouteId);
 
       if (route == null || !route.IsActive)
       {
@@ -212,7 +293,49 @@ namespace STMS.Api.Controllers
         });
       }
 
-      // Prevent duplicate stop order
+      // Existing rule:
+      // A stop with any subscriptions cannot move
+      // to another route, including historical ones.
+      if (stop.RouteId != request.RouteId)
+      {
+        var hasSubscriptions =
+            await HasAnySubscriptionsAsync(id);
+
+        if (hasSubscriptions)
+        {
+          return Conflict(new
+          {
+            message = "Cannot move a stop to another route because it has subscriptions."
+          });
+        }
+      }
+
+      var name = request.Name.Trim();
+
+      // Protect stop details for current/future
+      // subscriptions in protected statuses.
+      var protectedFieldsChanged =
+          !string.Equals(
+              stop.Name,
+              name,
+              StringComparison.Ordinal) ||
+          stop.StopOrder != request.StopOrder ||
+          !Equals(
+              stop.PickupTime,
+              request.PickupTime) ||
+          !Equals(
+              stop.DropoffTime,
+              request.DropoffTime);
+
+      if (protectedFieldsChanged &&
+          await HasProtectedSubscriptionsAsync(id))
+      {
+        return Conflict(new
+        {
+          message = "Cannot change stop details while protected subscriptions exist."
+        });
+      }
+
       var duplicateOrder = await _context.Stops
           .AnyAsync(s =>
               s.RouteId == request.RouteId &&
@@ -227,29 +350,26 @@ namespace STMS.Api.Controllers
         });
       }
 
-      // Prevent moving a stop linked to subscriptions
-      // to another route
-      if (stop.RouteId != request.RouteId)
-      {
-        var hasSubscriptions = await _context.Subscriptions
-            .AnyAsync(s => s.StopId == id);
-
-        if (hasSubscriptions)
-        {
-          return Conflict(new
-          {
-            message = "Cannot move a stop to another route because it has subscriptions."
-          });
-        }
-      }
-
       stop.RouteId = request.RouteId;
-      stop.Name = request.Name.Trim();
+      stop.Name = name;
       stop.StopOrder = request.StopOrder;
       stop.PickupTime = request.PickupTime;
       stop.DropoffTime = request.DropoffTime;
 
-      await _context.SaveChangesAsync();
+      try
+      {
+        await _context.SaveChangesAsync();
+      }
+      catch (DbUpdateException ex)
+          when (ContainsOracleError(ex, "ORA-00001"))
+      {
+        return Conflict(new
+        {
+          message = "Stop order already exists for this route."
+        });
+      }
+
+      await transaction.CommitAsync();
 
       return Ok(new
       {
@@ -261,11 +381,42 @@ namespace STMS.Api.Controllers
     }
 
     // DELETE /api/stops/admin/{id}
-    // Admin: Delete a stop if it has no subscriptions
+    // Admin: Delete only if no subscriptions exist
     [HttpDelete("admin/{id:int}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteStop(int id)
     {
+      var snapshot = await _context.Stops
+          .AsNoTracking()
+          .FirstOrDefaultAsync(s => s.StopId == id);
+
+      if (snapshot == null)
+      {
+        return NotFound(new
+        {
+          message = "Stop not found."
+        });
+      }
+
+      await using var transaction =
+          await _context.Database.BeginTransactionAsync();
+
+      if (!await LockRouteAsync(snapshot.RouteId))
+      {
+        return Conflict(new
+        {
+          message = "Stop route is no longer available."
+        });
+      }
+
+      if (!await LockStopAsync(id))
+      {
+        return NotFound(new
+        {
+          message = "Stop not found."
+        });
+      }
+
       var stop = await _context.Stops
           .FirstOrDefaultAsync(s => s.StopId == id);
 
@@ -277,11 +428,15 @@ namespace STMS.Api.Controllers
         });
       }
 
-      // Prevent deleting a stop linked to subscriptions
-      var hasSubscriptions = await _context.Subscriptions
-          .AnyAsync(s => s.StopId == id);
+      if (stop.RouteId != snapshot.RouteId)
+      {
+        return Conflict(new
+        {
+          message = "Stop was modified concurrently. Please retry."
+        });
+      }
 
-      if (hasSubscriptions)
+      if (await HasAnySubscriptionsAsync(id))
       {
         return Conflict(new
         {
@@ -291,13 +446,123 @@ namespace STMS.Api.Controllers
 
       _context.Stops.Remove(stop);
 
-      await _context.SaveChangesAsync();
+      try
+      {
+        await _context.SaveChangesAsync();
+      }
+      catch (DbUpdateException ex)
+          when (ContainsOracleError(ex, "ORA-02292"))
+      {
+        return Conflict(new
+        {
+          message = "Cannot delete a stop linked to existing records."
+        });
+      }
+
+      await transaction.CommitAsync();
 
       return Ok(new
       {
         message = "Stop deleted successfully.",
         stopId = id
       });
+    }
+
+    // ========================================
+    // HELPERS
+    // ========================================
+
+    private async Task<bool> HasAnySubscriptionsAsync(
+        int stopId)
+    {
+      return await _context.Subscriptions
+          .AsNoTracking()
+          .AnyAsync(s => s.StopId == stopId);
+    }
+
+    private async Task<bool> HasProtectedSubscriptionsAsync(
+        int stopId)
+    {
+      var today = DateTime.Today;
+
+      return await _context.Subscriptions
+          .AsNoTracking()
+          .AnyAsync(s =>
+              s.StopId == stopId &&
+              s.EndDate >= today &&
+              (s.Status == "Pending" ||
+               s.Status == "AwaitingPayment" ||
+               s.Status == "Approved"));
+    }
+
+    private async Task<bool> LockRouteAsync(int routeId)
+    {
+      return await LockRowAsync(
+          "ROUTES", "ROUTEID", routeId);
+    }
+
+    private async Task<bool> LockStopAsync(int stopId)
+    {
+      return await LockRowAsync(
+          "STOPS", "STOPID", stopId);
+    }
+
+    private async Task<bool> LockRowAsync(
+        string tableName,
+        string columnName,
+        int id)
+    {
+      var transaction =
+          _context.Database.CurrentTransaction
+          ?? throw new InvalidOperationException(
+              "An active transaction is required.");
+
+      var connection =
+          _context.Database.GetDbConnection();
+
+      await using var command =
+          connection.CreateCommand();
+
+      command.Transaction =
+          transaction.GetDbTransaction();
+
+      command.CommandText =
+          $"SELECT {columnName} FROM {tableName} " +
+          $"WHERE {columnName} = :id FOR UPDATE";
+
+      command.CommandTimeout = 30;
+
+      var parameter = command.CreateParameter();
+      parameter.ParameterName = "id";
+      parameter.Value = id;
+
+      command.Parameters.Add(parameter);
+
+      await using var reader =
+          await command.ExecuteReaderAsync();
+
+      return await reader.ReadAsync();
+    }
+
+    private static bool ContainsOracleError(
+        Exception exception,
+        string errorCode)
+    {
+      Exception? current = exception;
+
+      while (current != null)
+      {
+        if (current.Message.Contains(
+            errorCode,
+            StringComparison.OrdinalIgnoreCase))
+        {
+          return true;
+        }
+
+        current = current.InnerException;
+      }
+
+      return false;
     }
   }
 }

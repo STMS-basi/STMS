@@ -1,7 +1,7 @@
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using STMS.Api.DTOs.Drivers;
 using STMS.Infrastructure.Data;
 
@@ -102,7 +102,8 @@ namespace STMS.Api.Controllers
         {
           return Conflict(new
           {
-            message = "A driver with this license number already exists."
+            message =
+                  "A driver with this license number already exists."
           });
         }
       }
@@ -179,7 +180,8 @@ namespace STMS.Api.Controllers
         {
           return Conflict(new
           {
-            message = "A driver with this license number already exists."
+            message =
+                  "A driver with this license number already exists."
           });
         }
       }
@@ -208,6 +210,20 @@ namespace STMS.Api.Controllers
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeactivateDriver(int id)
     {
+      // The transaction and driver row lock prevent
+      // concurrent route assignment and deactivation
+      // from making conflicting decisions.
+      await using var transaction =
+          await _context.Database.BeginTransactionAsync();
+
+      if (!await LockDriverAsync(id))
+      {
+        return NotFound(new
+        {
+          message = "Driver not found."
+        });
+      }
+
       var driver = await _context.Drivers
           .FirstOrDefaultAsync(d => d.DriverId == id);
 
@@ -227,7 +243,8 @@ namespace STMS.Api.Controllers
         });
       }
 
-      // Check assigned routes
+      // Load route statuses and check in C#
+      // to avoid Oracle Boolean translation issues.
       var assignedRoutes = await _context.Routes
           .AsNoTracking()
           .Where(r => r.DriverId == id)
@@ -238,18 +255,19 @@ namespace STMS.Api.Controllers
           })
           .ToListAsync();
 
-      // Check status in C# to avoid Oracle Boolean issues
       if (assignedRoutes.Any(r => r.IsActive))
       {
         return Conflict(new
         {
-          message = "Cannot deactivate a driver assigned to an active route."
+          message =
+                "Cannot deactivate a driver assigned to an active route."
         });
       }
 
       driver.IsActive = false;
 
       await _context.SaveChangesAsync();
+      await transaction.CommitAsync();
 
       return Ok(new
       {
@@ -264,6 +282,17 @@ namespace STMS.Api.Controllers
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ActivateDriver(int id)
     {
+      await using var transaction =
+          await _context.Database.BeginTransactionAsync();
+
+      if (!await LockDriverAsync(id))
+      {
+        return NotFound(new
+        {
+          message = "Driver not found."
+        });
+      }
+
       var driver = await _context.Drivers
           .FirstOrDefaultAsync(d => d.DriverId == id);
 
@@ -286,12 +315,51 @@ namespace STMS.Api.Controllers
       driver.IsActive = true;
 
       await _context.SaveChangesAsync();
+      await transaction.CommitAsync();
 
       return Ok(new
       {
         message = "Driver activated successfully.",
         driverId = driver.DriverId
       });
+    }
+
+    // ========================================
+    // HELPERS
+    // ========================================
+
+    private async Task<bool> LockDriverAsync(int driverId)
+    {
+      var transaction =
+          _context.Database.CurrentTransaction
+          ?? throw new InvalidOperationException(
+              "An active transaction is required.");
+
+      var connection =
+          _context.Database.GetDbConnection();
+
+      await using var command =
+          connection.CreateCommand();
+
+      command.Transaction =
+          transaction.GetDbTransaction();
+
+      command.CommandText =
+          "SELECT DRIVERID FROM DRIVERS " +
+          "WHERE DRIVERID = :id FOR UPDATE";
+
+      command.CommandTimeout = 30;
+
+      var parameter = command.CreateParameter();
+      parameter.ParameterName = "id";
+      parameter.Value = driverId;
+
+      command.Parameters.Add(parameter);
+
+      await using var reader =
+          await command.ExecuteReaderAsync();
+
+      return await reader.ReadAsync();
     }
   }
 }

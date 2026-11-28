@@ -22,10 +22,9 @@ namespace STMS.Api.Controllers
     }
 
     // ============================================
-    // PARENT ENDPOINTS
+    // PARENT: GET MY PAYMENTS
     // ============================================
 
-    // GET: api/payments/my
     [HttpGet("my")]
     [Authorize(Roles = "Parent")]
     public async Task<IActionResult> GetMyPayments()
@@ -50,7 +49,6 @@ namespace STMS.Api.Controllers
             p.Subscription.ReferenceNumber,
             studentName = p.Subscription.Student.FullName,
 
-            // Subscription period
             startDate = p.Subscription.StartDate,
             endDate = p.Subscription.EndDate,
 
@@ -67,10 +65,9 @@ namespace STMS.Api.Controllers
     }
 
     // ============================================
-    // ADMIN ENDPOINTS
+    // ADMIN: GET ALL PAYMENTS
     // ============================================
 
-    // GET: api/payments/admin
     [HttpGet("admin")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAllPayments()
@@ -85,7 +82,6 @@ namespace STMS.Api.Controllers
             p.Subscription.ReferenceNumber,
             studentName = p.Subscription.Student.FullName,
 
-            // Subscription period
             startDate = p.Subscription.StartDate,
             endDate = p.Subscription.EndDate,
 
@@ -103,10 +99,9 @@ namespace STMS.Api.Controllers
     }
 
     // ============================================
-    // ADMIN: RECORD PAYMENT
+    // ADMIN: CONFIRM FULL PAYMENT
     // ============================================
 
-    // POST: api/payments/admin
     [HttpPost("admin")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> RecordPayment(
@@ -118,8 +113,8 @@ namespace STMS.Api.Controllers
           message = "Valid subscription ID and positive amount are required."
         });
 
-      var userIdValue = User.FindFirstValue(
-          ClaimTypes.NameIdentifier);
+      var userIdValue =
+          User.FindFirstValue(ClaimTypes.NameIdentifier);
 
       if (!int.TryParse(userIdValue, out var adminUserId))
         return Unauthorized(new
@@ -132,8 +127,7 @@ namespace STMS.Api.Controllers
 
       try
       {
-        // Lock the subscription row before reading payment data.
-        // This serializes payment requests for the same subscription.
+        // Lock subscription to prevent concurrent payments.
         var connection = _context.Database.GetDbConnection();
         var dbTransaction = transaction.GetDbTransaction();
 
@@ -163,24 +157,52 @@ namespace STMS.Api.Controllers
             });
         }
 
-        // Read subscription after acquiring the row lock.
+        // Read after acquiring the lock.
+        // Keep tracked so status can be updated.
         var subscription = await _context.Subscriptions
-            .AsNoTracking()
-            .FirstAsync(s =>
+            .FirstOrDefaultAsync(s =>
                 s.SubscriptionId == request.SubscriptionId);
 
-        if (subscription.Status != "Approved")
-          return Conflict(new
+        if (subscription == null)
+          return NotFound(new
           {
-            message = "Only approved subscriptions can receive payments."
+            message = "Subscription not found."
           });
 
-        // Read payment after acquiring the subscription lock.
+        // Admin must accept the request first.
+        if (subscription.Status != "AwaitingPayment")
+          return Conflict(new
+          {
+            message = "Only subscriptions awaiting payment can receive payment confirmation."
+          });
+
+        // Full payment only. No installments.
+        if (request.Amount != subscription.Fee)
+          return BadRequest(new
+          {
+            message = "The full subscription fee must be paid in one payment. Installments are not allowed.",
+            requiredAmount = subscription.Fee
+          });
+
+        // Check any existing payment record.
         var payment = await _context.Payments
             .FirstOrDefaultAsync(p =>
                 p.SubscriptionId == request.SubscriptionId);
 
-        // One payment summary record per subscription.
+        // Protect old payment records.
+        // Never overwrite a paid or partially paid record.
+        if (payment != null &&
+            (payment.AmountPaid != 0m ||
+             payment.Status == "Paid" ||
+             payment.Status == "Partial"))
+        {
+          return Conflict(new
+          {
+            message = "This subscription already has a recorded payment. Existing payment records cannot be overwritten."
+          });
+        }
+
+        // Create a payment summary if none exists.
         if (payment == null)
         {
           payment = new Payment
@@ -193,44 +215,43 @@ namespace STMS.Api.Controllers
 
           _context.Payments.Add(payment);
         }
+        else
+        {
+          // An existing unpaid record must match the fee.
+          if (payment.AmountDue != subscription.Fee)
+            return Conflict(new
+            {
+              message = "Existing payment amount does not match the subscription fee."
+            });
+        }
 
-        decimal remainingAmount =
-            payment.AmountDue - payment.AmountPaid;
-
-        if (request.Amount > remainingAmount)
-          return BadRequest(new
-          {
-            message = "Payment amount exceeds the remaining balance.",
-            remainingAmount
-          });
-
-        // Update payment amount safely inside the transaction.
-        payment.AmountPaid += request.Amount;
-
-        payment.Status =
-            payment.AmountPaid >= payment.AmountDue
-                ? "Paid"
-                : "Partial";
-
+        // Confirm the full payment.
+        payment.AmountDue = subscription.Fee;
+        payment.AmountPaid = subscription.Fee;
+        payment.Status = "Paid";
         payment.PaymentDate = DateTime.UtcNow;
         payment.RecordedBy = adminUserId;
         payment.Notes = request.Notes;
 
+        // Activate subscription only after full payment.
+        subscription.Status = "Approved";
+
+        // Save both changes in one transaction.
         await _context.SaveChangesAsync();
 
-        // Release the lock after successfully saving.
         await transaction.CommitAsync();
 
         return Ok(new
         {
-          message = "Payment recorded successfully.",
+          message = "Full payment confirmed and subscription approved successfully.",
           paymentId = payment.PaymentId,
-          subscriptionId = payment.SubscriptionId,
+          subscriptionId = subscription.SubscriptionId,
           amountDue = payment.AmountDue,
           amountPaid = payment.AmountPaid,
           remainingAmount =
                 payment.AmountDue - payment.AmountPaid,
-          status = payment.Status
+          paymentStatus = payment.Status,
+          subscriptionStatus = subscription.Status
         });
       }
       catch
@@ -246,8 +267,8 @@ namespace STMS.Api.Controllers
 
     private async Task<int?> GetParentIdAsync()
     {
-      var userIdValue = User.FindFirstValue(
-          ClaimTypes.NameIdentifier);
+      var userIdValue =
+          User.FindFirstValue(ClaimTypes.NameIdentifier);
 
       if (!int.TryParse(userIdValue, out var userId))
         return null;

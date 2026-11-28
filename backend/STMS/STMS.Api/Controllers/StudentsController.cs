@@ -210,8 +210,9 @@ namespace STMS.Api.Controllers
           message = "Student not found."
         });
 
-      // Prevent deleting students with transport subscriptions
+      // Do not delete students with any subscription history.
       var hasSubscriptions = await _context.Subscriptions
+          .AsNoTracking()
           .AnyAsync(s => s.StudentId == id);
 
       if (hasSubscriptions)
@@ -221,7 +222,35 @@ namespace STMS.Api.Controllers
         });
 
       _context.Students.Remove(student);
-      await _context.SaveChangesAsync();
+
+      try
+      {
+        await _context.SaveChangesAsync();
+      }
+      catch (DbUpdateConcurrencyException)
+      {
+        return NotFound(new
+        {
+          message = "Student not found."
+        });
+      }
+      catch (DbUpdateException)
+      {
+        // A subscription might have been created after
+        // the initial existence check.
+        var nowHasSubscriptions = await _context.Subscriptions
+            .AsNoTracking()
+            .AnyAsync(s => s.StudentId == id);
+
+        if (nowHasSubscriptions)
+          return Conflict(new
+          {
+            message = "Cannot delete a student with transport subscriptions."
+          });
+
+        // Preserve unexpected database errors for diagnosis.
+        throw;
+      }
 
       return Ok(new
       {
